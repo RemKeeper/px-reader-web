@@ -1,11 +1,10 @@
 # Cloudflare Pages 部署配置
-# 如果使用 wrangler CLI 部署，此文件会被读取
+# 声明 pages_build_output_dir 后，wrangler 会以 Pages 模式部署该目录
+# 等价命令：npx wrangler pages deploy dist --project-name=px-reader
 
 name = "px-reader"
 compatibility_date = "2024-01-01"
-
-# 纯静态 SPA，不需要 Workers 代码
-# 使用 `npx wrangler pages deploy dist --project-name=px-reader` 部署
+pages_build_output_dir = "./dist"
 
 # [vars]
 # VITE_API_BASE_URL = "https://px-reader-api.workers.dev"
