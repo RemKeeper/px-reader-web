@@ -1,0 +1,143 @@
+/* ── CSS 变量主题系统 ────────────────────────────── */
+
+:root {
+  --color-primary: #6c63ff;
+  --color-secondary: #a29bfe;
+  --color-accent: #fd79a8;
+}
+
+/* 深色主题 (默认) */
+.theme-dark {
+  --color-bg: #0f0f23;
+  --color-surface: #1a1a2e;
+  --color-text: #e8e8f0;
+  --color-text-secondary: #8888a0;
+  --color-border: #2a2a40;
+}
+
+/* 浅色主题 */
+.theme-light {
+  --color-bg: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-text: #1a1a2e;
+  --color-text-secondary: #666680;
+  --color-border: #e0e0e8;
+}
+
+/* 护眼主题 */
+.theme-sepia {
+  --color-bg: #f4ecd8;
+  --color-surface: #faf5e8;
+  --color-text: #3d3427;
+  --color-text-secondary: #8a7d6b;
+  --color-border: #e0d8c4;
+}
+
+/* ── 全局基础样式 ───────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Vant 主题覆盖 ──────────────────────────────── */
+
+:root:root {
+  --van-primary-color: var(--color-primary);
+  --van-text-color: var(--color-text);
+  --van-text-color-2: var(--color-text-secondary);
+  --van-text-color-3: var(--color-text-secondary);
+  --van-background: var(--color-bg);
+  --van-background-2: var(--color-surface);
+  --van-border-color: var(--color-border);
+  --van-active-color: var(--color-surface);
+  --van-nav-bar-background: var(--color-surface);
+  --van-nav-bar-title-text-color: var(--color-text);
+  --van-nav-bar-icon-color: var(--color-text);
+  --van-tabbar-background: var(--color-surface);
+  --van-tabbar-item-active-background: var(--color-surface);
+  --van-cell-background: var(--color-surface);
+  --van-cell-text-color: var(--color-text);
+  --van-cell-value-color: var(--color-text-secondary);
+  --van-cell-label-color: var(--color-text-secondary);
+  --van-cell-group-title-color: var(--color-text-secondary);
+  --van-action-sheet-background: var(--color-surface);
+  --van-action-sheet-item-background: var(--color-surface);
+  --van-action-sheet-item-text-color: var(--color-text);
+  --van-loading-text-color: var(--color-text-secondary);
+  --van-slider-active-background: var(--color-primary);
+  --van-switch-on-background: var(--color-primary);
+}
+
+/* ── 滚动条样式 ─────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* ── 工具类 ─────────────────────────────────────── */
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 阅读器专用 ─────────────────────────────────── */
+
+.reader-body {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.chapter-block {
+  scroll-margin-top: 60px;
+}

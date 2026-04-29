@@ -1,0 +1,33 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment (keep .env.example, ignore actual secrets)
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Wrangler
+.wrangler/
+
+.idea

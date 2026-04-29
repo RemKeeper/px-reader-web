@@ -1,0 +1,185 @@
+<template>
+  <div class="settings-view min-h-screen bg-bg">
+    <NavBar title="设置" />
+
+    <div class="p-4 space-y-4">
+      <!-- 账号 -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false">
+          <van-cell
+            v-if="authStore.isLoggedIn"
+            title="Pixiv 账号"
+            value="已登录"
+            icon="user-o"
+            is-link
+          />
+          <van-cell
+            v-else
+            title="登录 Pixiv"
+            icon="user-o"
+            is-link
+            @click="authStore.login()"
+          />
+        </van-cell-group>
+      </div>
+
+      <!-- 阅读设置 -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false" title="阅读设置">
+          <van-cell title="字号" :value="`${settings.fontSize}px`" icon="font-o">
+            <template #right-icon>
+              <div class="flex items-center gap-2 ml-2">
+                <van-button size="mini" @click="adjustFontSize(-1)">A-</van-button>
+                <van-button size="mini" @click="adjustFontSize(1)">A+</van-button>
+              </div>
+            </template>
+          </van-cell>
+
+          <van-cell title="行高" :value="String(settings.lineHeight)" icon="bars">
+            <template #right-icon>
+              <div class="flex items-center gap-2 ml-2">
+                <van-button size="mini" @click="adjustLineHeight(-0.1)">-</van-button>
+                <van-button size="mini" @click="adjustLineHeight(0.1)">+</van-button>
+              </div>
+            </template>
+          </van-cell>
+
+          <van-cell title="字体" is-link @click="showFontPicker = true">
+            <template #value>
+              <span class="text-text-secondary">{{ fontLabel }}</span>
+            </template>
+          </van-cell>
+
+          <van-cell title="主题" is-link @click="showThemePicker = true">
+            <template #value>
+              <span class="text-text-secondary">{{ themeLabel }}</span>
+            </template>
+          </van-cell>
+
+          <van-cell title="分章字数" :value="`${settings.chapterMaxChars}`" />
+        </van-cell-group>
+      </div>
+
+      <!-- 数据管理 -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false" title="数据管理">
+          <van-cell
+            title="导入 TXT 文件"
+            icon="upgrade"
+            is-link
+            @click="router.push('/import')"
+          />
+          <van-cell
+            title="书架管理"
+            icon="bookmark-o"
+            is-link
+            @click="router.push('/shelf')"
+          />
+          <van-cell title="清除缓存" icon="delete-o" is-link @click="clearCache" />
+        </van-cell-group>
+      </div>
+
+      <!-- 关于 -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false">
+          <van-cell title="版本" value="1.0.0" icon="info-o" />
+          <van-cell title="PX-Reader" value="Pixiv 小说阅读器" />
+        </van-cell-group>
+      </div>
+    </div>
+
+    <!-- 字体选择 -->
+    <van-action-sheet v-model:show="showFontPicker" title="选择字体">
+      <div class="p-4 space-y-2">
+        <van-button
+          v-for="f in fontOptions"
+          :key="f.value"
+          block
+          :type="settings.fontFamily === f.value ? 'primary' : 'default'"
+          @click="settingsStore.updateSettings({ fontFamily: f.value as any }); showFontPicker = false"
+        >
+          {{ f.label }}
+        </van-button>
+      </div>
+    </van-action-sheet>
+
+    <!-- 主题选择 -->
+    <van-action-sheet v-model:show="showThemePicker" title="选择主题">
+      <div class="p-4 space-y-2">
+        <van-button
+          v-for="t in themeOptions"
+          :key="t.value"
+          block
+          :type="settings.theme === t.value ? 'primary' : 'default'"
+          @click="settingsStore.updateSettings({ theme: t.value as any }); showThemePicker = false"
+        >
+          {{ t.label }}
+        </van-button>
+      </div>
+    </van-action-sheet>
+
+    <TabBar />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { showToast, showConfirmDialog } from 'vant'
+import { useAuthStore, useSettingsStore } from '@/stores'
+import NavBar from '@/components/NavBar.vue'
+import TabBar from '@/components/TabBar.vue'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+const settings = computed(() => settingsStore.settings)
+
+const showFontPicker = ref(false)
+const showThemePicker = ref(false)
+
+const fontOptions = [
+  { label: '黑体 (Noto Sans SC)', value: 'sans' },
+  { label: '宋体 (Noto Serif SC)', value: 'serif' },
+  { label: '等宽 (JetBrains Mono)', value: 'mono' },
+]
+
+const themeOptions = [
+  { label: '深色模式', value: 'dark' },
+  { label: '浅色模式', value: 'light' },
+  { label: '护眼模式', value: 'sepia' },
+]
+
+const fontLabel = computed(() => {
+  const f = fontOptions.find((o) => o.value === settings.value.fontFamily)
+  return f?.label || '宋体'
+})
+
+const themeLabel = computed(() => {
+  const t = themeOptions.find((o) => o.value === settings.value.theme)
+  return t?.label || '深色模式'
+})
+
+function adjustFontSize(delta: number) {
+  const v = Math.max(12, Math.min(32, settings.value.fontSize + delta))
+  settingsStore.updateSettings({ fontSize: v })
+}
+
+function adjustLineHeight(delta: number) {
+  const v = Math.max(1.2, Math.min(3.0, +(settings.value.lineHeight + delta).toFixed(1)))
+  settingsStore.updateSettings({ lineHeight: v })
+}
+
+async function clearCache() {
+  try {
+    await showConfirmDialog({ title: '清除缓存', message: '确定要清除所有缓存数据吗？' })
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k)))
+    }
+    showToast('缓存已清除')
+  } catch {
+    // 取消
+  }
+}
+</script>
