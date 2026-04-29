@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { NovelMeta } from '@/types'
+import { ref } from 'vue'
+import { ApiError, type NovelMeta } from '@/types'
 import {
   getRecommendedNovels,
   getFollowNovels,
   getUserNovels,
   getNovelText,
-  ApiError,
 } from '@/api'
 import { useAuthStore } from './auth'
 

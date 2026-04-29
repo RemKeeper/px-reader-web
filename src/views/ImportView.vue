@@ -87,7 +87,7 @@ import { showToast } from 'vant'
 import { splitChaptersInWorker, decodeTextInWorker } from '@/workers'
 import { saveTxtCache, getAllTxtCaches, removeTxtCache } from '@/db'
 import { useSettingsStore, useShelfStore } from '@/stores'
-import type { TxtFileCache, TxtChapter, LocalNovelMeta } from '@/types'
+import type { TxtFileCache, LocalNovelMeta } from '@/types'
 import NavBar from '@/components/NavBar.vue'
 
 const router = useRouter()

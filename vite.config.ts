@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
     Components({
       resolvers: [VantResolver()],
     }),
-    VitePWA({
+    ...(env.DISABLE_PWA ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
@@ -83,7 +83,7 @@ export default defineConfig(({ mode }) => {
           },
         ],
       },
-    }),
+    })]),
   ],
   server: {
     proxy: {

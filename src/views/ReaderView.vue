@@ -210,12 +210,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { useNovelStore, useSettingsStore, useShelfStore } from '@/stores'
 import { splitChaptersInWorker } from '@/workers'
-import { saveTxtCache, getTxtCache } from '@/db'
+import { getTxtCache } from '@/db'
 import type { TxtChapter, LocalNovelMeta } from '@/types'
 
 const props = defineProps<{ id: string }>()

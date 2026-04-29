@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     title?: string
     showBack?: boolean

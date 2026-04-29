@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { getLoginUrl, handleCallback, refreshToken, ApiError } from '@/api'
+import { ref } from 'vue'
+import { getLoginUrl, handleCallback, refreshToken } from '@/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = ref(false)
