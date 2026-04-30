@@ -24,11 +24,18 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     let message = `HTTP ${res.status}`
-    try {
-      const body = await res.json()
-      message = body.error || message
-    } catch {
-      message = (await res.text()) || message
+    // 只读一次响应体：先取文本，再尝试 JSON 解析。
+    // 后端 http.Error() 会返回 text/plain，重复读流会触发
+    // "Failed to execute 'text' on 'Response': body stream already read"
+    // 并把真正的服务端错误信息吞掉。
+    const text = await res.text().catch(() => '')
+    if (text) {
+      try {
+        const body = JSON.parse(text)
+        message = body.error || body.message || text
+      } catch {
+        message = text
+      }
     }
     throw new ApiError(message, res.status)
   }
@@ -42,8 +49,11 @@ export function getLoginUrl(): Promise<LoginResponse> {
   return request('/login')
 }
 
-export function handleCallback(code: string): Promise<MessageResponse> {
-  return request(`/callback?code=${encodeURIComponent(code)}`)
+export function handleCallback(code: string, codeVerifier: string): Promise<MessageResponse> {
+  const qs = new URLSearchParams()
+  qs.set('code', code)
+  qs.set('code_verifier', codeVerifier)
+  return request(`/callback?${qs.toString()}`)
 }
 
 export function refreshToken(): Promise<MessageResponse> {

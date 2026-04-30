@@ -24,7 +24,12 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      const { login_url } = await getLoginUrl()
+      const { login_url, code_verifier } = await getLoginUrl()
+      // 用 localStorage 而不是跨站 Cookie / sessionStorage，
+      // 避免桌面 App 拉起浏览器后丢失。
+      if (code_verifier) {
+        localStorage.setItem('pixiv_cv', code_verifier)
+      }
       window.location.href = login_url
     } catch (e) {
       error.value = e instanceof Error ? e.message : '登录失败'
@@ -38,7 +43,12 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      await handleCallback(code)
+      const codeVerifier = localStorage.getItem('pixiv_cv') || ''
+      if (!codeVerifier) {
+        throw new Error('本地未找到登录会话（code_verifier），请重新登录')
+      }
+      await handleCallback(code, codeVerifier)
+      localStorage.removeItem('pixiv_cv')
       isLoggedIn.value = true
       return true
     } catch (e) {

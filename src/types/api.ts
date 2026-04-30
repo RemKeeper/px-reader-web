@@ -97,6 +97,8 @@ export interface NovelTextResponse {
 /** 登录响应 */
 export interface LoginResponse {
   login_url: string
+  /** PKCE code_verifier，前端需在本地暂存，回调时传回后端 */
+  code_verifier: string
 }
 
 /** 通用消息响应 */
