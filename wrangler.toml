@@ -1,7 +1,7 @@
 # Cloudflare Workers Static Assets 部署配置
 # CI 使用 `wrangler deploy`，通过 [assets] 上传 ./dist 作为纯静态站点
 
-name = "px-reader"
+name = "px-reader-web"
 compatibility_date = "2024-01-01"
 
 [assets]
