@@ -11,13 +11,20 @@ const CHAPTER_PATTERNS = [
   /^─{3,}.*─{3,}$/m,
 ]
 
+/** 分章结果，附带是否检测到自然章节 */
+export interface SplitChaptersResult {
+  chapters: TxtChapter[]
+  /** 是否基于章节标题自然分割（false = 字数兜底） */
+  hasNaturalSplits: boolean
+}
+
 /**
  * 对全文进行分章
  * @param content 全文内容
  * @param maxChars 每章最大字符数
  * @returns 分章结果
  */
-export function splitChapters(content: string, maxChars: number): TxtChapter[] {
+export function splitChapters(content: string, maxChars: number): SplitChaptersResult {
   const chapters: TxtChapter[] = []
 
   // 尝试按章节标题分章
@@ -53,7 +60,7 @@ export function splitChapters(content: string, maxChars: number): TxtChapter[] {
         endOffset: end,
       })
     }
-    return chapters
+    return { chapters, hasNaturalSplits: true }
   }
 
   // 否则按最大字符数分章
@@ -69,7 +76,7 @@ export function splitChapters(content: string, maxChars: number): TxtChapter[] {
       }
     }
     const chunk = content.slice(offset, end)
-    const firstLine = chunk.split('\n')[0]?.trim() || `第 ${index + 1} 章`
+    const firstLine = chunk.split('\n')[0]?.trim() || `第 ${index + 1} 段`
     chapters.push({
       index,
       title: firstLine.slice(0, 50),
@@ -80,7 +87,7 @@ export function splitChapters(content: string, maxChars: number): TxtChapter[] {
     index++
   }
 
-  return chapters
+  return { chapters, hasNaturalSplits: false }
 }
 
 /**

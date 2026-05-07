@@ -133,7 +133,7 @@ async function processFile(file: File) {
     processingStatus.value = '分章处理...'
 
     // 分章
-    const chapters = await splitChaptersInWorker(content, settingsStore.settings.chapterMaxChars)
+    const { chapters } = await splitChaptersInWorker(content, settingsStore.settings.chapterMaxChars)
 
     // 生成 ID
     const id = `txt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`

@@ -57,6 +57,21 @@
           </van-cell>
 
           <van-cell title="分章字数" :value="`${settings.chapterMaxChars}`" />
+
+          <van-cell title="显示章节导航" center>
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                仅在检测到自然章节标题时显示
+              </span>
+            </template>
+            <template #right-icon>
+              <van-switch
+                :model-value="settings.showChapterNav"
+                size="20"
+                @update:model-value="settingsStore.updateSettings({ showChapterNav: $event })"
+              />
+            </template>
+          </van-cell>
         </van-cell-group>
       </div>
 

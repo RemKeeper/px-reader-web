@@ -82,9 +82,9 @@
         />
       </div>
 
-      <!-- 章节导航 -->
+      <!-- 章节导航：仅在有多章且检测到自然章节标题时显示（字数兜底划分不展示） -->
       <div
-        v-if="chapters.length > 1 && settingsStore.settings.showChapterNav"
+        v-if="chapters.length > 1 && hasNaturalChapters && settingsStore.settings.showChapterNav"
         class="sticky top-0 z-10 bg-surface/90 backdrop-blur-sm border-b border-border"
       >
         <div class="flex overflow-x-auto gap-2 p-2 no-scrollbar">
@@ -109,7 +109,7 @@
           class="chapter-block mb-8"
         >
           <h2
-            v-if="chapters.length > 1"
+            v-if="chapters.length > 1 && hasNaturalChapters"
             class="font-bold mb-4 text-text"
             :style="{ fontSize: `calc(var(--reader-font-size, 18px) * 1.3)` }"
           >
@@ -189,14 +189,21 @@
             active-color="var(--color-primary)"
             @change="onSliderChange"
           />
-          <span class="text-xs text-text-secondary w-12">
+          <span
+            v-if="chapters.length > 1 && hasNaturalChapters"
+            class="text-xs text-text-secondary w-12"
+          >
             {{ activeChapter + 1 }}/{{ chapters.length }}
           </span>
         </div>
 
         <!-- 操作按钮 -->
         <div class="flex items-center justify-around py-3 px-4">
-          <div class="flex-col-center cursor-pointer" @click="prevChapter">
+          <div
+            v-if="hasNaturalChapters"
+            class="flex-col-center cursor-pointer"
+            @click="prevChapter"
+          >
             <van-icon name="arrow-left" size="20" class="text-text" />
             <span class="text-xs text-text-secondary mt-1">上一章</span>
           </div>
@@ -208,7 +215,11 @@
             <van-icon name="bookmark-o" size="20" class="text-text" />
             <span class="text-xs text-text-secondary mt-1">书签</span>
           </div>
-          <div class="flex-col-center cursor-pointer" @click="nextChapter">
+          <div
+            v-if="hasNaturalChapters"
+            class="flex-col-center cursor-pointer"
+            @click="nextChapter"
+          >
             <van-icon name="arrow" size="20" class="text-text" />
             <span class="text-xs text-text-secondary mt-1">下一章</span>
           </div>
@@ -321,6 +332,8 @@ const shelfStore = useShelfStore()
 const loading = ref(true)
 const content = ref('')
 const chapters = ref<TxtChapter[]>([])
+/** 分章是否来自自然章节标题（vs 按字数兜底划分） */
+const hasNaturalChapters = ref(false)
 const novelTitle = ref('')
 const showControls = ref(false)
 const showSettings = ref(false)
@@ -517,6 +530,9 @@ onMounted(async () => {
   if (cached) {
     content.value = cached.content
     chapters.value = cached.chapters
+    // 本地缓存不带 hasNaturalSplits、从章节标题启发式判定
+    hasNaturalChapters.value = cached.chapters.length > 1 &&
+      cached.chapters.some((c) => /^(第[一二三四五六七八九十百千万零\d]+[章节回卷篇集部]|Chapter\s+\d+)/i.test(c.title))
     novelTitle.value = cached.fileName
     loading.value = false
   } else {
@@ -524,7 +540,9 @@ onMounted(async () => {
     const text = await novelStore.loadNovelText(novelId)
     if (text) {
       content.value = text
-      chapters.value = await splitChaptersInWorker(text, settingsStore.settings.chapterMaxChars)
+      const result = await splitChaptersInWorker(text, settingsStore.settings.chapterMaxChars)
+      chapters.value = result.chapters
+      hasNaturalChapters.value = result.hasNaturalSplits
       if (!novelMeta.value) novelTitle.value = `小说 #${novelId}`
     }
     loading.value = false
