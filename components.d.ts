@@ -14,6 +14,7 @@ declare module 'vue' {
     NovelCard: typeof import('./src/components/NovelCard.vue')['default']
     NovelStats: typeof import('./src/components/NovelStats.vue')['default']
     NovelTags: typeof import('./src/components/NovelTags.vue')['default']
+    PixivProtocolTip: typeof import('./src/components/PixivProtocolTip.vue')['default']
     ReaderContent: typeof import('./src/components/ReaderContent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

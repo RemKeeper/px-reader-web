@@ -27,11 +27,16 @@
     <p class="text-text-secondary text-xs mt-8 text-center leading-relaxed">
       登录后可获取推荐小说、关注动态等个性化内容
     </p>
+
+    <div class="mt-6 w-full max-w-md mx-auto">
+      <PixivProtocolTip />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useAuthStore } from '@/stores'
+import PixivProtocolTip from '@/components/PixivProtocolTip.vue'
 
 const authStore = useAuthStore()
 </script>

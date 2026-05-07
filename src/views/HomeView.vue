@@ -15,6 +15,10 @@
           登录 Pixiv
         </van-button>
       </div>
+
+      <div class="mt-4">
+        <PixivProtocolTip />
+      </div>
     </div>
 
     <!-- 推荐列表 -->
@@ -85,6 +89,7 @@ import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import BlockedBanner from '@/components/BlockedBanner.vue'
+import PixivProtocolTip from '@/components/PixivProtocolTip.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
