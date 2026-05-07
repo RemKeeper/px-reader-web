@@ -93,6 +93,58 @@ img {
   --van-loading-text-color: var(--color-text-secondary);
   --van-slider-active-background: var(--color-primary);
   --van-switch-on-background: var(--color-primary);
+
+  /* 弹窗背景 */
+  --van-dialog-background: var(--color-surface);
+  --van-dialog-header-text-color: var(--color-text);
+  --van-dialog-message-color: var(--color-text);
+  --van-dialog-confirm-button-text-color: var(--color-primary);
+  --van-dialog-cancel-button-text-color: var(--color-text-secondary);
+  --van-popup-background: var(--color-surface);
+  --van-popup-close-icon-color: var(--color-text-secondary);
+  --van-toast-background: rgba(0, 0, 0, 0.85);
+  --van-notify-text-color: #fff;
+  --van-overlay-background: rgba(0, 0, 0, 0.7);
+  --van-action-sheet-header-background: var(--color-surface);
+  --van-action-sheet-header-text-color: var(--color-text);
+  --van-action-sheet-description-color: var(--color-text-secondary);
+  --van-action-sheet-cancel-text-color: var(--color-text-secondary);
+  --van-picker-background: var(--color-surface);
+  --van-picker-toolbar-background: var(--color-surface);
+  --van-share-sheet-background: var(--color-surface);
+  --van-notify-background: var(--color-surface);
+}
+
+/* ── Vant 弹层补丁：确保所有弹窗有不透明背景 ──── */
+.van-dialog,
+.van-popup,
+.van-action-sheet,
+.van-picker,
+.van-share-sheet,
+.van-notify {
+  background: var(--color-surface) !important;
+  color: var(--color-text);
+}
+
+.van-dialog__header,
+.van-dialog__content,
+.van-dialog__message,
+.van-dialog__footer,
+.van-action-sheet__item,
+.van-action-sheet__cancel,
+.van-action-sheet__header,
+.van-action-sheet__description {
+  background: var(--color-surface) !important;
+  color: var(--color-text);
+}
+
+.van-dialog__message {
+  color: var(--color-text) !important;
+}
+
+.van-dialog__cancel,
+.van-dialog__confirm {
+  background: var(--color-surface) !important;
 }
 
 /* ── 滚动条样式 ─────────────────────────────────── */

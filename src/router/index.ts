@@ -46,6 +46,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '设置' },
   },
   {
+    path: '/settings/blocked',
+    name: 'blocked-settings',
+    component: () => import('@/views/BlockedSettingsView.vue'),
+    meta: { title: '屏蔽管理' },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),

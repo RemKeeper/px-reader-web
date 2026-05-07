@@ -37,9 +37,10 @@
         :offset="200"
         @load="onLoadMore"
       >
+        <BlockedBanner :novels="novelStore.search" />
         <div class="space-y-3 mt-2">
           <NovelCard
-            v-for="novel in novelStore.search"
+            v-for="novel in visibleSearch"
             :key="novel.id"
             :novel="novel"
             @click="goToNovel(novel.id)"
@@ -55,18 +56,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useNovelStore } from '@/stores'
+import { useNovelStore, useBlockStore } from '@/stores'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import BlockedBanner from '@/components/BlockedBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
 const novelStore = useNovelStore()
+const blockStore = useBlockStore()
 
 const word = ref('')
 const listLoading = ref(false)
+
+const visibleSearch = computed(() =>
+  novelStore.search.filter((n) => !blockStore.evaluate(n)),
+)
 
 const title = computed(() => (novelStore.searchKeyword ? `搜索: ${novelStore.searchKeyword}` : '搜索'))
 

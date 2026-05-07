@@ -22,20 +22,29 @@
       >
         {{ userInfo.is_followed ? '已关注' : '关注' }}
       </van-button>
+      <van-button
+        size="small"
+        :type="isAuthorBlocked ? 'warning' : 'default'"
+        round
+        @click="toggleBlock"
+      >
+        {{ isAuthorBlocked ? '已屏蔽' : '屏蔽' }}
+      </van-button>
     </div>
 
     <!-- 小说列表 -->
     <div class="p-3">
+      <BlockedBanner :novels="novels" />
       <div v-if="loading" class="py-12">
         <van-loading type="spinner" color="var(--color-primary)" class="flex-center" />
       </div>
 
-      <EmptyState v-else-if="novels.length === 0" message="该用户暂无小说" />
+      <EmptyState v-else-if="visibleNovels.length === 0" message="该用户暂无小说" />
 
       <template v-else>
         <div class="space-y-3">
           <NovelCard
-            v-for="novel in novels"
+            v-for="novel in visibleNovels"
             :key="novel.id"
             :novel="novel"
             @click="goToNovel(novel.id)"
@@ -61,16 +70,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNovelStore } from '@/stores'
+import { showConfirmDialog, showToast } from 'vant'
+import { useNovelStore, useBlockStore } from '@/stores'
 import { getProxiedImageUrl } from '@/api'
 import type { NovelMeta, PixivUser } from '@/types'
 import NavBar from '@/components/NavBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import BlockedBanner from '@/components/BlockedBanner.vue'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
 const novelStore = useNovelStore()
+const blockStore = useBlockStore()
 
 const loading = ref(true)
 const loadingMore = ref(false)
@@ -80,6 +92,35 @@ const nextUrl = ref<string | null>(null)
 const avatarFailed = ref(false)
 
 const userName = computed(() => userInfo.value?.name || '')
+
+const isAuthorBlocked = computed(() =>
+  userInfo.value ? blockStore.isAuthorBlocked(userInfo.value.id) : false,
+)
+
+const visibleNovels = computed<NovelMeta[]>(() =>
+  novels.value.filter((n) => !blockStore.evaluate(n)),
+)
+
+async function toggleBlock() {
+  if (!userInfo.value) return
+  const u = userInfo.value
+  if (isAuthorBlocked.value) {
+    blockStore.unblockAuthor(u.id)
+    showToast('已解除屏蔽')
+    return
+  }
+  try {
+    await showConfirmDialog({
+      title: '屏蔽作者',
+      message: `屏蔽后,作者「${u.name}」的所有小说将不再展示在推荐/搜索/关注列表中。是否继续？`,
+      confirmButtonText: '屏蔽',
+    })
+    blockStore.blockAuthor(u.id, u.name)
+    showToast('已屏蔽该作者')
+  } catch {
+    // 取消
+  }
+}
 
 const avatarSrc = computed(() => {
   if (avatarFailed.value) return ''
@@ -115,4 +156,5 @@ onMounted(async () => {
   }
   loading.value = false
 })
+
 </script>

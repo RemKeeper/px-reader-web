@@ -14,11 +14,23 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
 import { useSettingsStore } from '@/stores'
 
 const settingsStore = useSettingsStore()
 
 const keepAlivePages = ['HomeView', 'ShelfView', 'FollowView']
+
+// 把主题 class 同步到 <html>，让 teleport 到 body 的 Vant 弹层也能继承 CSS 变量
+watch(
+  () => settingsStore.settings.theme,
+  (theme) => {
+    const root = document.documentElement
+    root.classList.remove('theme-dark', 'theme-light', 'theme-sepia')
+    root.classList.add(`theme-${theme}`)
+  },
+  { immediate: true },
+)
 </script>
 
 <style>

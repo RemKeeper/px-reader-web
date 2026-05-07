@@ -24,9 +24,10 @@
       />
 
       <template v-else>
+        <BlockedBanner :novels="novelStore.follow" />
         <div class="space-y-3">
           <NovelCard
-            v-for="novel in novelStore.follow"
+            v-for="novel in visibleFollow"
             :key="novel.id"
             :novel="novel"
             @click="goToNovel(novel.id)"
@@ -57,17 +58,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore, useNovelStore } from '@/stores'
+import { useAuthStore, useNovelStore, useBlockStore } from '@/stores'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import BlockedBanner from '@/components/BlockedBanner.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const novelStore = useNovelStore()
+const blockStore = useBlockStore()
+
+const visibleFollow = computed(() =>
+  novelStore.follow.filter((n) => !blockStore.evaluate(n)),
+)
 
 onMounted(async () => {
   const loggedIn = await authStore.checkLogin()

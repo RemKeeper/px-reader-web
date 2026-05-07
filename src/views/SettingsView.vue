@@ -94,6 +94,51 @@
         </van-cell-group>
       </div>
 
+      <!-- 屏蔽设置 -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false" title="屏蔽设置">
+          <van-cell
+            title="屏蔽管理"
+            icon="closed-eye"
+            is-link
+            :value="`${blockStore.blockedAuthors.length} 作者 / ${blockStore.blockedTags.length + blockStore.blockedTagSubstrings.length} 标签`"
+            @click="router.push('/settings/blocked')"
+          />
+          <van-cell title="标签数量超过即屏蔽" center>
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                单篇文章 tag 数量大于此值则屏蔽，0 表示关闭
+              </span>
+            </template>
+            <template #right-icon>
+              <van-stepper
+                :model-value="blockStore.maxTagCount"
+                :min="0"
+                :max="50"
+                integer
+                @update:model-value="(v) => blockStore.setMaxTagCount(Number(v))"
+              />
+            </template>
+          </van-cell>
+          <van-cell title="单个标签长度超过即屏蔽" center>
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                单个 tag 字符数大于此值则屏蔽，0 表示关闭
+              </span>
+            </template>
+            <template #right-icon>
+              <van-stepper
+                :model-value="blockStore.maxTagLength"
+                :min="0"
+                :max="100"
+                integer
+                @update:model-value="(v) => blockStore.setMaxTagLength(Number(v))"
+              />
+            </template>
+          </van-cell>
+        </van-cell-group>
+      </div>
+
       <!-- 关于 -->
       <div class="bg-surface rounded-xl overflow-hidden">
         <van-cell-group :border="false">
@@ -141,13 +186,14 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
-import { useAuthStore, useSettingsStore } from '@/stores'
+import { useAuthStore, useSettingsStore, useBlockStore } from '@/stores'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const blockStore = useBlockStore()
 const settings = computed(() => settingsStore.settings)
 
 const showFontPicker = ref(false)

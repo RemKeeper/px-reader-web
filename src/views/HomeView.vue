@@ -51,6 +51,7 @@
 
       <!-- 下拉刷新 + 滚动加载 -->
       <van-pull-refresh v-else v-model="refreshing" @refresh="onRefresh">
+        <BlockedBanner :novels="novelStore.recommended" />
         <van-list
           v-model:loading="listLoading"
           :finished="listFinished"
@@ -61,7 +62,7 @@
         >
           <div class="space-y-3">
             <NovelCard
-              v-for="novel in novelStore.recommended"
+              v-for="novel in visibleRecommended"
               :key="novel.id"
               :novel="novel"
               @click="goToNovel(novel.id)"
@@ -78,15 +79,17 @@
 <script setup lang="ts">
 import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore, useNovelStore } from '@/stores'
+import { useAuthStore, useNovelStore, useBlockStore } from '@/stores'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import BlockedBanner from '@/components/BlockedBanner.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const novelStore = useNovelStore()
+const blockStore = useBlockStore()
 
 /** 缓存有效期 5 分钟 */
 const CACHE_TTL = 5 * 60 * 1000
@@ -147,4 +150,8 @@ onActivated(() => {
 function goToNovel(id: number) {
   router.push(`/novel/${id}`)
 }
+
+const visibleRecommended = computed(() =>
+  novelStore.recommended.filter((n) => !blockStore.evaluate(n)),
+)
 </script>
