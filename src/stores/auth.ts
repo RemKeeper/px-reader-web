@@ -33,8 +33,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 发起登录：生成 PKCE，跳转到 Pixiv 登录页 */
-  async function login(): Promise<void> {
+  /** 发起登录：生成 PKCE，跳转到 Pixiv 登录页。返回 login_url 以便调用方
+   * 在用户手势同步上下文中用 window.open 打开（提高 WebView 兼容性）。
+   */
+  async function login(): Promise<string | null> {
     loading.value = true
     error.value = null
     try {
@@ -42,9 +44,31 @@ export const useAuthStore = defineStore('auth', () => {
       // 用 localStorage 而不是 sessionStorage / 跨站 Cookie，
       // 避免桌面 App 拉起浏览器后丢失。
       localStorage.setItem('pixiv_cv', code_verifier)
+      // 默认行为：直接跳转。调用方如果想自定义打开方式（window.open
+      // 转外部浏览器、复制链接等），应改为只调用 prepareLogin。
       window.location.href = login_url
+      return login_url
     } catch (e) {
       error.value = e instanceof Error ? e.message : '登录失败'
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** 仅准备登录 URL（保存 code_verifier），不做跳转。
+   * 用于 WebView 兼容场景：拿到 URL 后由 UI 决定是 window.open / 复制 / location.href。
+   */
+  async function prepareLogin(): Promise<string | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const { login_url, code_verifier } = await getLoginUrl()
+      localStorage.setItem('pixiv_cv', code_verifier)
+      return login_url
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '登录失败'
+      return null
     } finally {
       loading.value = false
     }
@@ -101,6 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     checkLogin,
     login,
+    prepareLogin,
     callback,
     refresh,
     logout,
