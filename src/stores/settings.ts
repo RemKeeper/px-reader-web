@@ -11,6 +11,9 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   chapterMaxChars: 5000,
   showChapterNav: true,
   autoPageInterval: 0,
+  hdrEyeCare: false,
+  hdrBrightness: 100,
+  hdrWarmFilter: 0,
 }
 
 export const useSettingsStore = defineStore(

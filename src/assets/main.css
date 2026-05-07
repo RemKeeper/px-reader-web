@@ -6,6 +6,40 @@
   --color-accent: #fd79a8;
 }
 
+/* HDR 屏幕护眼适配（实验性）：
+   - 强制 sRGB 渲染，避免浏览器把 #FFF 映射到 HDR 峰值亮度
+   - 柔化主题极值色（纯白/纯黑），降低 OLED 对比度疲劳
+   - 略降饱和度，缓解广色域过饱和 */
+.hdr-eye-care {
+  color-scheme: light dark;
+}
+.hdr-eye-care body {
+  filter: saturate(0.92);
+}
+/* 浅色主题：纯白 → 纸白 */
+.hdr-eye-care.theme-light,
+html.hdr-eye-care .theme-light {
+  --color-bg: #ede8dc;
+  --color-surface: #f5f2ea;
+  --color-text: #2b2b2b;
+  --color-text-secondary: #666660;
+  --color-border: #d8d3c5;
+}
+/* 深色主题：纯黑 → 深灰，避免 OLED 极致对比度 */
+.hdr-eye-care.theme-dark,
+html.hdr-eye-care .theme-dark {
+  --color-bg: #18182a;
+  --color-surface: #20203a;
+  --color-text: #d0d0d8;
+  --color-text-secondary: #8888a0;
+  --color-border: #2f2f48;
+}
+/* 护眼主题保留，仅微调字体色避免过黑 */
+.hdr-eye-care.theme-sepia,
+html.hdr-eye-care .theme-sepia {
+  --color-text: #4a4030;
+}
+
 /* 深色主题 (默认) */
 .theme-dark {
   --color-bg: #0f0f23;

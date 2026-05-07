@@ -75,6 +75,70 @@
         </van-cell-group>
       </div>
 
+      <!-- HDR 屏幕护眼适配（实验性） -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false" title="显示与护眼">
+          <van-cell title="HDR 屏幕护眼适配" center>
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                实验性：柔化纯白/纯黑、限制 sRGB 色域、略降饱和度，缓解 HDR/OLED 屏疲劳
+              </span>
+            </template>
+            <template #right-icon>
+              <van-switch
+                :model-value="!!settings.hdrEyeCare"
+                size="20"
+                @update:model-value="settingsStore.updateSettings({ hdrEyeCare: $event })"
+              />
+            </template>
+          </van-cell>
+          <van-cell
+            v-if="settings.hdrEyeCare"
+            title="屏幕亮度限制"
+            :value="`${settings.hdrBrightness ?? 100}%`"
+          >
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                叠加黑色蒙版进一步压暗，适合系统已最低亮度仍刺眼时
+              </span>
+            </template>
+            <template #right-icon>
+              <div class="w-32 ml-2">
+                <van-slider
+                  :model-value="settings.hdrBrightness ?? 100"
+                  :min="30"
+                  :max="100"
+                  :step="5"
+                  @update:model-value="(v) => settingsStore.updateSettings({ hdrBrightness: Number(v) })"
+                />
+              </div>
+            </template>
+          </van-cell>
+          <van-cell
+            v-if="settings.hdrEyeCare"
+            title="暖色滤镜"
+            :value="`${settings.hdrWarmFilter ?? 0}%`"
+          >
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                叠加暖橙色蒙版，过滤蓝光，0% 关闭
+              </span>
+            </template>
+            <template #right-icon>
+              <div class="w-32 ml-2">
+                <van-slider
+                  :model-value="settings.hdrWarmFilter ?? 0"
+                  :min="0"
+                  :max="100"
+                  :step="5"
+                  @update:model-value="(v) => settingsStore.updateSettings({ hdrWarmFilter: Number(v) })"
+                />
+              </div>
+            </template>
+          </van-cell>
+        </van-cell-group>
+      </div>
+
       <!-- 数据管理 -->
       <div class="bg-surface rounded-xl overflow-hidden">
         <van-cell-group :border="false" title="数据管理">

@@ -84,6 +84,12 @@ export interface ReaderSettings {
   showChapterNav: boolean
   /** 自动翻页间隔 (秒, 0=关闭) */
   autoPageInterval: number
+  /** HDR 屏幕护眼适配 (实验性) */
+  hdrEyeCare?: boolean
+  /** HDR 模式：屏幕亮度限制 0-100，100=不压暗 */
+  hdrBrightness?: number
+  /** HDR 模式：暖色滤镜强度 0-100，0=关闭 */
+  hdrWarmFilter?: number
 }
 
 /** TXT 文件缓存 */
