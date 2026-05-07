@@ -84,6 +84,8 @@ import { useAuthStore } from '@/stores'
 const props = defineProps<{
   /** 是否显示「新标签页打开 / 复制登录链接」辅助按钮（默认 true） */
   showLoginHelper?: boolean
+  /** 已预取的登录 URL；提供后辅助按钮可同步执行，规避 WebView 拦截 */
+  preparedUrl?: string | null
 }>()
 
 const showLoginHelper = computed(() => props.showLoginHelper !== false)
@@ -137,12 +139,21 @@ async function copyCurrentUrl() {
 }
 
 async function openInNewTab() {
-  const url = await authStore.prepareLogin()
-  if (!url) {
-    showToast(authStore.error || '获取登录链接失败')
-    return
+  // 优先使用预取 URL，可在用户手势同步上下文中调用 window.open，
+  // 避免 await 后被 WebView 拦截弹窗。
+  let url = props.preparedUrl || null
+  let w: Window | null = null
+  if (url) {
+    w = window.open(url, '_blank', 'noopener,noreferrer')
   }
-  const w = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!url) {
+    url = await authStore.prepareLogin()
+    if (!url) {
+      showToast(authStore.error || '获取登录链接失败')
+      return
+    }
+    w = window.open(url, '_blank', 'noopener,noreferrer')
+  }
   if (!w) {
     const ok = await copyToClipboard(url)
     showToast(ok ? '弹窗被拦截，已复制登录链接，请粘贴到系统浏览器打开' : '请手动复制链接')
@@ -150,7 +161,7 @@ async function openInNewTab() {
 }
 
 async function copyLoginUrl() {
-  const url = await authStore.prepareLogin()
+  const url = props.preparedUrl || (await authStore.prepareLogin())
   if (!url) {
     showToast(authStore.error || '获取登录链接失败')
     return

@@ -13,9 +13,9 @@
       round
       block
       size="large"
-      :loading="authStore.loading"
+      :loading="authStore.loading || preparing"
       loading-text="跳转中..."
-      @click="authStore.login()"
+      @click="handleLogin"
     >
       登录 Pixiv
     </van-button>
@@ -29,14 +29,55 @@
     </p>
 
     <div class="mt-6 w-full max-w-md mx-auto">
-      <PixivProtocolTip />
+      <PixivProtocolTip :prepared-url="preparedUrl" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { showToast } from 'vant'
 import { useAuthStore } from '@/stores'
 import PixivProtocolTip from '@/components/PixivProtocolTip.vue'
 
 const authStore = useAuthStore()
+
+// 预取的登录 URL：在页面挂载时就准备好，
+// 这样点击按钮时可同步跳转，避免在 Via 等严格 WebView 中
+// 因 await 丢失用户手势而拦截导航。
+const preparedUrl = ref<string | null>(null)
+const preparing = ref(false)
+
+async function prepare() {
+  if (preparedUrl.value || preparing.value) return
+  preparing.value = true
+  try {
+    preparedUrl.value = await authStore.prepareLogin()
+  } finally {
+    preparing.value = false
+  }
+}
+
+onMounted(prepare)
+
+async function handleLogin(e: MouseEvent) {
+  // 已预取：同步跳转（保留用户手势上下文）
+  if (preparedUrl.value) {
+    try {
+      window.location.assign(preparedUrl.value)
+    } catch {
+      window.location.href = preparedUrl.value
+    }
+    return
+  }
+  // 未预取（如刚进入即点击或预取失败）：尝试再取一次
+  e.preventDefault()
+  const url = await authStore.prepareLogin()
+  if (url) {
+    preparedUrl.value = url
+    window.location.href = url
+  } else {
+    showToast(authStore.error || '获取登录链接失败，请检查网络后重试')
+  }
+}
 </script>
