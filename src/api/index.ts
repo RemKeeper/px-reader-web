@@ -354,7 +354,7 @@ function extractNovelFromHtml(html: string): NovelTextResponse | null {
       try {
         const obj = JSON.parse(m[1]) as WebviewNovelJson
         if (obj && typeof obj.text === 'string') return webviewNovelToResponse(obj)
-        if (obj && typeof obj.novel_text === 'string') return obj as NovelTextResponse
+        if (obj && typeof obj.novel_text === 'string') return obj as unknown as NovelTextResponse
       } catch { /* try next */ }
     }
   }
