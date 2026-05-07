@@ -11,14 +11,27 @@
             title="Pixiv 账号"
             value="已登录"
             icon="user-o"
-            is-link
           />
           <van-cell
             v-else
             title="登录 Pixiv"
             icon="user-o"
             is-link
-            @click="authStore.login()"
+            to="/login"
+          />
+          <van-cell
+            title="手动填写 refresh_token"
+            icon="edit"
+            is-link
+            label="登录兜底：用于在 OAuth 跳转不可用时手动输入凭证"
+            @click="showManualLogin = true"
+          />
+          <van-cell
+            v-if="authStore.isLoggedIn"
+            title="退出登录"
+            icon="close"
+            is-link
+            @click="onLogout"
           />
         </van-cell-group>
       </div>
@@ -242,6 +255,40 @@
       </div>
     </van-action-sheet>
 
+    <!-- 手动填写 refresh_token -->
+    <van-action-sheet v-model:show="showManualLogin" title="手动登录">
+      <div class="p-4 space-y-3">
+        <div class="bg-orange-500/10 border border-orange-500/40 rounded-lg p-3 text-xs leading-relaxed text-text">
+          <p class="font-medium mb-1">使用说明</p>
+          <p class="text-text-secondary">
+            仅在无法完成正常 OAuth 流程时使用。你需要提前通过其他工具（如 pixivpy / pixiv_auth.py）获取 refresh_token，粘贴到下方。存储在本地 localStorage，请勿在公共设备使用。
+          </p>
+        </div>
+        <van-field
+          v-model="manualToken"
+          label="refresh_token"
+          type="textarea"
+          rows="3"
+          autosize
+          placeholder="貌似： XxXxXxXx-xxxxxxxxxxxxxxxxxxxxxx"
+          :disabled="authStore.loading"
+        />
+        <div class="flex gap-2">
+          <van-button block plain @click="showManualLogin = false">取消</van-button>
+          <van-button
+            block
+            type="primary"
+            :loading="authStore.loading"
+            loading-text="验证中..."
+            :disabled="!manualToken.trim()"
+            @click="submitManualLogin"
+          >
+            验证并登录
+          </van-button>
+        </div>
+      </div>
+    </van-action-sheet>
+
     <TabBar />
   </div>
 </template>
@@ -262,6 +309,8 @@ const settings = computed(() => settingsStore.settings)
 
 const showFontPicker = ref(false)
 const showThemePicker = ref(false)
+const showManualLogin = ref(false)
+const manualToken = ref('')
 
 const fontOptions = [
   { label: '黑体 (Noto Sans SC)', value: 'sans' },
@@ -303,6 +352,32 @@ async function clearCache() {
       await Promise.all(keys.map((k) => caches.delete(k)))
     }
     showToast('缓存已清除')
+  } catch {
+    // 取消
+  }
+}
+
+async function submitManualLogin() {
+  const rt = manualToken.value.trim()
+  if (!rt) return
+  const ok = await authStore.loginManual(rt)
+  if (ok) {
+    showToast('登录成功')
+    manualToken.value = ''
+    showManualLogin.value = false
+  } else {
+    showToast(authStore.error || '验证失败，请检查 refresh_token')
+  }
+}
+
+async function onLogout() {
+  try {
+    await showConfirmDialog({
+      title: '退出登录',
+      message: '确定退出吗？本地 token 将被清除。',
+    })
+    authStore.logout()
+    showToast('已退出登录')
   } catch {
     // 取消
   }

@@ -5,6 +5,7 @@ import {
   handleCallback,
   refreshToken,
   hasTokens,
+  loginWithRefreshToken,
   logout as clearLocalAuth,
 } from '@/api'
 
@@ -119,6 +120,23 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggedIn.value = false
   }
 
+  /** 手动登录兜底：用户填入 refresh_token 后验证并保存 */
+  async function loginManual(rt: string): Promise<boolean> {
+    loading.value = true
+    error.value = null
+    try {
+      await loginWithRefreshToken(rt)
+      isLoggedIn.value = true
+      return true
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '手动登录失败'
+      isLoggedIn.value = false
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     isLoggedIn,
     loading,
@@ -130,5 +148,6 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     logout,
     handle401,
+    loginManual,
   }
 })

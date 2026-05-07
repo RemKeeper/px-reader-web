@@ -11,13 +11,20 @@
       <div class="bg-surface rounded-xl p-6 text-center">
         <van-icon name="user-o" size="48" class="text-primary mb-3" />
         <p class="text-text mb-4">登录 Pixiv 账号以获取推荐小说</p>
-        <van-button type="primary" round block @click="authStore.login()">
+        <van-button
+          type="primary"
+          round
+          block
+          :loading="authStore.loading || preparing"
+          loading-text="跳转中..."
+          @click="handleLogin"
+        >
           登录 Pixiv
         </van-button>
       </div>
 
       <div class="mt-4">
-        <PixivProtocolTip />
+        <PixivProtocolTip :prepared-url="preparedUrl" />
       </div>
     </div>
 
@@ -83,6 +90,7 @@
 <script setup lang="ts">
 import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { showToast } from 'vant'
 import { useAuthStore, useNovelStore, useBlockStore } from '@/stores'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
@@ -95,6 +103,67 @@ const router = useRouter()
 const authStore = useAuthStore()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
+
+// 【诊断】预取登录 URL，点击时同步跳转，避免严格 WebView 丢失用户手势
+const preparedUrl = ref<string | null>(null)
+const preparing = ref(false)
+
+function diag(...args: unknown[]) {
+  // eslint-disable-next-line no-console
+  console.log('[home-login-diag]', ...args)
+}
+
+async function preparePixivLogin() {
+  if (preparedUrl.value || preparing.value || authStore.isLoggedIn) return
+  preparing.value = true
+  diag('prepare:start', {
+    ua: navigator.userAgent,
+    isSecureContext: window.isSecureContext,
+    hasCryptoSubtle: !!(window.crypto && (window.crypto as Crypto & { subtle?: SubtleCrypto }).subtle),
+    hasGetRandomValues: !!(window.crypto && typeof window.crypto.getRandomValues === 'function'),
+    href: location.href,
+  })
+  try {
+    const url = await authStore.prepareLogin()
+    preparedUrl.value = url
+    diag('prepare:done', { hasUrl: !!url, error: authStore.error })
+  } catch (e) {
+    diag('prepare:throw', e)
+  } finally {
+    preparing.value = false
+  }
+}
+
+async function handleLogin(e: MouseEvent) {
+  diag('click', { hasPreparedUrl: !!preparedUrl.value, isTrusted: e.isTrusted })
+  if (preparedUrl.value) {
+    const url = preparedUrl.value
+    diag('navigate:sync', url.slice(0, 80) + '...')
+    try {
+      window.location.assign(url)
+    } catch (err) {
+      diag('navigate:assign-failed, fallback to href', err)
+      try {
+        window.location.href = url
+      } catch (err2) {
+        diag('navigate:href-failed', err2)
+        showToast('跳转被浏览器拦截，请使用下方“复制登录链接”')
+      }
+    }
+    return
+  }
+  e.preventDefault()
+  diag('navigate:async-fallback')
+  const url = await authStore.prepareLogin()
+  if (url) {
+    preparedUrl.value = url
+    diag('navigate:async-go')
+    window.location.href = url
+  } else {
+    diag('navigate:async-no-url', authStore.error)
+    showToast(authStore.error || '获取登录链接失败，请检查网络后重试')
+  }
+}
 
 /** 缓存有效期 5 分钟 */
 const CACHE_TTL = 5 * 60 * 1000
@@ -146,10 +215,12 @@ async function onLoadMore() {
 onMounted(async () => {
   const loggedIn = await authStore.checkLogin()
   if (loggedIn) await ensureRecommended()
+  else preparePixivLogin()
 })
 
 onActivated(() => {
   if (authStore.isLoggedIn) ensureRecommended()
+  else preparePixivLogin()
 })
 
 function goToNovel(id: number) {

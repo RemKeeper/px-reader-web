@@ -129,6 +129,23 @@ export function logout(): void {
   clearTokens()
 }
 
+/** 手动登录兜底：用户从外部工具拿到 refresh_token 后直接写入并验证。
+ * 流程：保存仅含 refreshToken 的占位 → 调 refreshToken() 真正换出 access_token；
+ * 失败时清空，避免留下脏数据。
+ */
+export async function loginWithRefreshToken(rt: string): Promise<void> {
+  const value = rt.trim()
+  if (!value) throw new ApiError('refresh_token 不能为空', 400)
+  // 写一个临时占位（access 留空、视作已过期），让 refreshToken() 走正常流程
+  saveTokens({ accessToken: '', refreshToken: value, expiresAt: 0 })
+  try {
+    await refreshToken()
+  } catch (e) {
+    clearTokens()
+    throw e
+  }
+}
+
 export function hasTokens(): boolean {
   return !!loadTokens()
 }
