@@ -39,9 +39,29 @@
         <div class="flex-1 min-w-0 flex flex-col justify-between">
           <div>
             <h3 class="text-text text-sm font-bold text-ellipsis">{{ novel.title }}</h3>
-            <p class="text-text-secondary text-xs mt-1">{{ novel.authorName }}</p>
+            <div
+              v-if="novel.authorName"
+              class="flex items-center gap-1 mt-1 w-fit"
+              @click.stop="goToAuthor(novel.authorId)"
+            >
+              <img
+                v-if="novel.authorAvatar"
+                :src="getProxiedImageUrl(novel.authorAvatar)"
+                class="w-4 h-4 rounded-full object-cover"
+              />
+              <span class="text-text-secondary text-xs hover:text-primary transition-colors">
+                {{ novel.authorName }}
+              </span>
+            </div>
+            <NovelTags
+              v-if="novel.tags?.length"
+              :tags="novel.tags"
+              :max="3"
+              size="sm"
+              class="mt-1.5"
+            />
           </div>
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between mt-1">
             <span class="text-text-secondary text-xs">
               {{ formatTime(novel.lastReadAt) }}
             </span>
@@ -69,6 +89,7 @@ import { getProxiedImageUrl } from '@/api'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import NovelTags from '@/components/NovelTags.vue'
 
 const router = useRouter()
 const shelfStore = useShelfStore()
@@ -79,6 +100,11 @@ onMounted(() => {
 
 function goToNovel(id: number) {
   router.push(`/novel/${id}`)
+}
+
+function goToAuthor(authorId: number) {
+  if (!authorId) return
+  router.push(`/user/${authorId}`)
 }
 
 function goImport() {

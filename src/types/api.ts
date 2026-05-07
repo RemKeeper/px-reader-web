@@ -86,12 +86,39 @@ export interface UserNovelsResponse {
   next_url: string | null
 }
 
+/** Pixiv 小说内嵌插画条目（webview JSON `illusts` 数组元素，可能形态多样） */
+export interface NovelIllustEntry {
+  visible?: boolean
+  availableMessage?: string | null
+  id?: string | number
+  page?: number
+  illust?: {
+    id?: string | number
+    title?: string
+    images?: { small?: string; medium?: string; original?: string }
+  }
+  user?: { id?: string | number; name?: string }
+  [k: string]: unknown
+}
+
+/** Pixiv 小说上传图片条目（webview JSON `images` 数组元素） */
+export interface NovelUploadedImageEntry {
+  novelImageId?: string | number
+  sl?: string
+  urls?: { original?: string; '480mw'?: string; '1200x1200'?: string; small?: string; medium?: string }
+  [k: string]: unknown
+}
+
 /** 小说正文响应 */
 export interface NovelTextResponse {
   novel_marker: Record<string, unknown>
   novel_text: string
   series_prev: Record<string, unknown>
   series_next: Record<string, unknown>
+  /** [pixivimage:ID(-N)] 引用的插画数据（key 为 illust id 或数组） */
+  illusts?: Record<string, NovelIllustEntry> | NovelIllustEntry[]
+  /** [uploadedimage:N] 引用的上传图片数据 */
+  images?: Record<string, NovelUploadedImageEntry> | NovelUploadedImageEntry[]
 }
 
 /** 登录响应 */

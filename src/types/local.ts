@@ -16,8 +16,8 @@ export interface LocalNovelMeta {
   authorAvatar: string
   /** 简介 */
   caption: string
-  /** 标签列表 */
-  tags: string[]
+  /** 标签列表：推荐存储 {name, translated_name}，亦兼容早期纯字符串 */
+  tags: Array<{ name: string; translated_name?: string | null } | string>
   /** 总字数 */
   textLength: number
   /** 总书签数 */

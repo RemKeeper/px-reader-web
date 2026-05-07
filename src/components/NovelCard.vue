@@ -50,15 +50,13 @@
         </div>
 
         <!-- 标签 -->
-        <div v-if="novel.tags?.length" class="flex flex-wrap gap-1 mt-1.5">
-          <span
-            v-for="tag in novel.tags.slice(0, 3)"
-            :key="tag.name"
-            class="text-xs px-1.5 py-0.5 rounded bg-bg text-text-secondary"
-          >
-            {{ tag.name }}
-          </span>
-        </div>
+        <NovelTags
+          v-if="novel.tags?.length"
+          :tags="novel.tags"
+          :max="3"
+          size="sm"
+          class="mt-1.5"
+        />
       </div>
     </div>
   </div>
@@ -68,6 +66,7 @@
 import { computed, ref } from 'vue'
 import type { NovelMeta } from '@/types'
 import { getProxiedImageUrl } from '@/api'
+import NovelTags from './NovelTags.vue'
 
 const props = defineProps<{
   novel: NovelMeta

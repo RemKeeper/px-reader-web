@@ -41,6 +41,31 @@
       :style="settingsStore.cssVars"
       @click="onContentClick"
     >
+      <!-- 作品信息头 -->
+      <div v-if="novelMeta" class="bg-surface px-4 pt-6 pb-4 border-b border-border">
+        <h1 class="text-text text-lg font-bold leading-snug">{{ novelMeta.title }}</h1>
+        <div
+          class="flex items-center gap-2 mt-3 cursor-pointer w-fit"
+          @click.stop="goToAuthor"
+        >
+          <img
+            v-if="authorAvatar"
+            :src="authorAvatar"
+            class="w-7 h-7 rounded-full object-cover"
+          />
+          <span class="text-text text-sm hover:text-primary transition-colors">
+            {{ novelMeta.user?.name }}
+          </span>
+          <van-icon name="arrow" size="12" class="text-text-secondary" />
+        </div>
+        <NovelTags
+          v-if="novelMeta.tags?.length"
+          :tags="novelMeta.tags"
+          size="sm"
+          class="mt-3"
+        />
+      </div>
+
       <!-- 章节导航 -->
       <div
         v-if="chapters.length > 1 && settingsStore.settings.showChapterNav"
@@ -82,7 +107,51 @@
               fontFamily: 'var(--reader-font-family, serif)',
             }"
           >
-            {{ content.slice(ch.startOffset, ch.endOffset) }}
+            <template v-for="(tok, ti) in chapterTokens(ch)" :key="ti">
+              <template v-if="tok.type === 'text'">{{ tok.value }}</template>
+              <template v-else-if="tok.type === 'newpage'">
+                <hr class="my-6 border-border" />
+              </template>
+              <h3
+                v-else-if="tok.type === 'chapter'"
+                class="font-bold my-4 text-text"
+                :style="{ fontSize: `calc(var(--reader-font-size, 18px) * 1.2)` }"
+              >
+                {{ tok.title }}
+              </h3>
+              <ruby v-else-if="tok.type === 'rb'">
+                {{ tok.base }}<rt>{{ tok.ruby }}</rt>
+              </ruby>
+              <a
+                v-else-if="tok.type === 'jumpuri'"
+                :href="tok.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary underline"
+              >{{ tok.text }}</a>
+              <img
+                v-else-if="tok.type === 'pixivimage' && resolveIllust(tok.illustId, tok.page)"
+                :src="resolveIllust(tok.illustId, tok.page) || ''"
+                :alt="`pixivimage:${tok.illustId}-${tok.page}`"
+                class="block max-w-full my-4 rounded mx-auto"
+                loading="lazy"
+              />
+              <span
+                v-else-if="tok.type === 'pixivimage'"
+                class="inline-block px-2 py-1 my-2 rounded bg-bg text-text-secondary text-xs"
+              >[pixivimage:{{ tok.illustId }}-{{ tok.page }}]</span>
+              <img
+                v-else-if="tok.type === 'uploadedimage' && resolveUploaded(tok.imageId)"
+                :src="resolveUploaded(tok.imageId) || ''"
+                :alt="`uploadedimage:${tok.imageId}`"
+                class="block max-w-full my-4 rounded mx-auto"
+                loading="lazy"
+              />
+              <span
+                v-else-if="tok.type === 'uploadedimage'"
+                class="inline-block px-2 py-1 my-2 rounded bg-bg text-text-secondary text-xs"
+              >[uploadedimage:{{ tok.imageId }}]</span>
+            </template>
           </div>
         </div>
       </div>
@@ -210,13 +279,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { useNovelStore, useSettingsStore, useShelfStore } from '@/stores'
 import { splitChaptersInWorker } from '@/workers'
 import { getTxtCache } from '@/db'
-import type { TxtChapter, LocalNovelMeta } from '@/types'
+import { getProxiedImageUrl } from '@/api'
+import {
+  parseNovelMarkup,
+  resolvePixivImageUrl,
+  resolveUploadedImageUrl,
+  type NovelToken,
+} from '@/utils/novelMarkup'
+import type { TxtChapter, LocalNovelMeta, NovelMeta } from '@/types'
+import NovelTags from '@/components/NovelTags.vue'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -236,6 +313,19 @@ const activeChapter = ref(0)
 const isInShelf = ref(false)
 const contentRef = ref<HTMLElement | null>(null)
 const chapterRefs = ref<Map<number, HTMLElement>>(new Map())
+
+/** 当前作品元信息（从 store 缓存获取） */
+const novelMeta = ref<NovelMeta | null>(null)
+const authorAvatar = computed(() => {
+  const url = novelMeta.value?.user?.profile_image_urls?.medium
+  return url ? getProxiedImageUrl(url) : ''
+})
+
+function goToAuthor() {
+  const uid = novelMeta.value?.user?.id
+  if (!uid) return
+  router.push(`/user/${uid}`)
+}
 
 const fontOptions = [
   { label: '黑体', value: 'sans' },
@@ -259,6 +349,34 @@ function setChapterRef(index: number, el: HTMLElement | null) {
   if (el) chapterRefs.value.set(index, el)
   else chapterRefs.value.delete(index)
 }
+
+// ── Pixiv 内联标记渲染 ───────────────────────────────
+
+const tokensCache = new Map<string, NovelToken[]>()
+function chapterTokens(ch: TxtChapter): NovelToken[] {
+  const key = `${ch.startOffset}:${ch.endOffset}`
+  let toks = tokensCache.get(key)
+  if (!toks) {
+    toks = parseNovelMarkup(content.value.slice(ch.startOffset, ch.endOffset))
+    tokensCache.set(key, toks)
+  }
+  return toks
+}
+
+const illustsRef = computed(() => novelStore.currentIllusts)
+const imagesRef = computed(() => novelStore.currentImages)
+
+function resolveIllust(illustId: string, page: number): string | null {
+  const url = resolvePixivImageUrl(illustsRef.value, illustId, page)
+  return url ? getProxiedImageUrl(url) : null
+}
+
+function resolveUploaded(imageId: string): string | null {
+  const url = resolveUploadedImageUrl(imagesRef.value, imageId)
+  return url ? getProxiedImageUrl(url) : null
+}
+
+watch(() => content.value, () => tokensCache.clear())
 
 function onContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
@@ -308,19 +426,21 @@ async function toggleShelf() {
     isInShelf.value = false
     showToast('已从书架移除')
   } else {
+    const m = novelMeta.value
     const meta: LocalNovelMeta = {
       id: novelId,
-      title: novelTitle.value,
-      coverUrl: '',
-      authorName: '',
-      authorId: 0,
-      authorAvatar: '',
-      caption: '',
-      tags: [],
-      textLength: content.value.length,
-      totalBookmarks: 0,
-      totalView: 0,
-      isXRestricted: false,
+      title: m?.title || novelTitle.value,
+      coverUrl: m?.image_urls?.large || m?.image_urls?.medium || '',
+      authorName: m?.user?.name || '',
+      authorId: m?.user?.id || 0,
+      authorAvatar: m?.user?.profile_image_urls?.medium || '',
+      caption: m?.caption || '',
+      tags: m?.tags?.map((t) => ({ name: t.name, translated_name: t.translated_name })) || [],
+      textLength: m?.text_length || content.value.length,
+      totalBookmarks: m?.total_bookmarks || m?.total_bookmarks || 0,
+      totalView: m?.total_view || 0,
+      isXRestricted: !!m?.is_x_restricted,
+      series: m?.series?.id ? { id: m.series.id, title: m.series.title } : undefined,
       addedAt: Date.now(),
       lastReadAt: Date.now(),
     }
@@ -368,6 +488,13 @@ onMounted(async () => {
   // 检查是否在书架
   isInShelf.value = await shelfStore.isInShelf(Number(novelId))
 
+  // 先尝试从 store 缓存拿 meta（推荐/关注/搜索页跳转过来的会命中）
+  const cachedMeta = novelStore.getNovelMetaById(novelId)
+  if (cachedMeta) {
+    novelMeta.value = cachedMeta
+    novelTitle.value = cachedMeta.title
+  }
+
   // 先检查本地缓存
   const cached = await getTxtCache(novelId)
   if (cached) {
@@ -381,7 +508,7 @@ onMounted(async () => {
     if (text) {
       content.value = text
       chapters.value = await splitChaptersInWorker(text, settingsStore.settings.chapterMaxChars)
-      novelTitle.value = `小说 #${novelId}`
+      if (!novelMeta.value) novelTitle.value = `小说 #${novelId}`
     }
     loading.value = false
   }

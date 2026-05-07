@@ -1,0 +1,16 @@
+# Pixiv 极简代理 Worker
+
+# 部署：
+#   wrangler deploy --config worker/wrangler.toml
+#
+# 部署完成后，把生成的 *.workers.dev 域名（或自定义域名）写到前端
+# `.env.production` 的 `VITE_API_BASE_URL`。
+
+name = "px-reader-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# 如要绑定自定义域名，去掉下面注释并改成你的：
+# routes = [
+#   { pattern = "px.example.com/*", zone_name = "example.com" }
+# ]

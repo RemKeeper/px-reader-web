@@ -1,14 +1,28 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getLoginUrl, handleCallback, refreshToken } from '@/api'
+import {
+  getLoginUrl,
+  handleCallback,
+  refreshToken,
+  hasTokens,
+  logout as clearLocalAuth,
+} from '@/api'
 
 export const useAuthStore = defineStore('auth', () => {
-  const isLoggedIn = ref(false)
+  const isLoggedIn = ref(hasTokens())
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  /** 尝试调用一个需要认证的接口来检测登录状态 */
+  /**
+   * 检测登录状态。
+   * 纯前端架构下，凭据就是 localStorage 中的 refresh_token；
+   * 这里调用一次 refresh 验证它是否还有效。
+   */
   async function checkLogin(): Promise<boolean> {
+    if (!hasTokens()) {
+      isLoggedIn.value = false
+      return false
+    }
     try {
       await refreshToken()
       isLoggedIn.value = true
@@ -19,17 +33,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 发起登录 */
+  /** 发起登录：生成 PKCE，跳转到 Pixiv 登录页 */
   async function login(): Promise<void> {
     loading.value = true
     error.value = null
     try {
       const { login_url, code_verifier } = await getLoginUrl()
-      // 用 localStorage 而不是跨站 Cookie / sessionStorage，
+      // 用 localStorage 而不是 sessionStorage / 跨站 Cookie，
       // 避免桌面 App 拉起浏览器后丢失。
-      if (code_verifier) {
-        localStorage.setItem('pixiv_cv', code_verifier)
-      }
+      localStorage.setItem('pixiv_cv', code_verifier)
       window.location.href = login_url
     } catch (e) {
       error.value = e instanceof Error ? e.message : '登录失败'
@@ -38,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 处理回调 */
+  /** 处理 OAuth 回调：用 code + verifier 换 token */
   async function callback(code: string): Promise<boolean> {
     loading.value = true
     error.value = null
@@ -59,7 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 刷新 Token */
+  /** 刷新 token */
   async function refresh(): Promise<boolean> {
     try {
       await refreshToken()
@@ -71,8 +83,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 处理 401 错误 */
+  /** 登出：清除本地 token */
+  function logout() {
+    clearLocalAuth()
+    isLoggedIn.value = false
+  }
+
+  /** 业务侧 401 兜底 */
   function handle401() {
+    clearLocalAuth()
     isLoggedIn.value = false
   }
 
@@ -84,6 +103,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     callback,
     refresh,
+    logout,
     handle401,
   }
 })

@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { ApiError, type NovelMeta } from '@/types'
+import { ApiError, type NovelMeta, type NovelTextResponse } from '@/types'
 import {
   getRecommendedNovels,
   getFollowNovels,
   getUserNovels,
   getNovelText,
+  searchNovels,
 } from '@/api'
 import { useAuthStore } from './auth'
 
@@ -14,6 +15,22 @@ export const useNovelStore = defineStore('novel', () => {
   const recommended = ref<NovelMeta[]>([])
   const recommendedNextUrl = ref<string | null>(null)
   const recommendedLoading = ref(false)
+  /** 推荐缓存时间戳（ms） */
+  const recommendedCachedAt = ref<number>(0)
+
+  /** 按 id 索引的 NovelMeta 缓存（供阅读页/书架页补全信息） */
+  const metaById = ref<Record<number, NovelMeta>>({})
+
+  function cacheMetas(list: NovelMeta[]) {
+    if (!list?.length) return
+    const next = { ...metaById.value }
+    for (const n of list) if (n && n.id) next[n.id] = n
+    metaById.value = next
+  }
+
+  function getNovelMetaById(id: number | string): NovelMeta | undefined {
+    return metaById.value[Number(id)]
+  }
 
   /** 关注列表 */
   const follow = ref<NovelMeta[]>([])
@@ -22,6 +39,8 @@ export const useNovelStore = defineStore('novel', () => {
 
   /** 当前小说正文 */
   const currentText = ref('')
+  const currentIllusts = ref<NovelTextResponse['illusts']>(undefined)
+  const currentImages = ref<NovelTextResponse['images']>(undefined)
   const currentTextLoading = ref(false)
 
   /** 错误 */
@@ -45,6 +64,8 @@ export const useNovelStore = defineStore('novel', () => {
       })
       recommended.value = reset ? res.novels : [...recommended.value, ...res.novels]
       recommendedNextUrl.value = res.next_url
+      recommendedCachedAt.value = Date.now()
+      cacheMetas(res.novels)
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         useAuthStore().handle401()
@@ -73,6 +94,7 @@ export const useNovelStore = defineStore('novel', () => {
       })
       follow.value = reset ? res.novels : [...follow.value, ...res.novels]
       followNextUrl.value = res.next_url
+      cacheMetas(res.novels)
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         useAuthStore().handle401()
@@ -88,13 +110,50 @@ export const useNovelStore = defineStore('novel', () => {
   async function loadUserNovels(userId: string | number, offset?: string) {
     error.value = null
     try {
-      return await getUserNovels({ user_id: userId, offset })
+      const res = await getUserNovels({ user_id: userId, offset })
+      cacheMetas(res.novels)
+      return res
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         useAuthStore().handle401()
       }
       error.value = e instanceof Error ? e.message : '加载失败'
       return null
+    }
+  }
+
+  // ── 搜索 ──────────────────────────────────────────
+
+  const search = ref<NovelMeta[]>([])
+  const searchNextUrl = ref<string | null>(null)
+  const searchLoading = ref(false)
+  const searchKeyword = ref('')
+
+  async function loadSearch(word: string, reset = false) {
+    if (searchLoading.value) return
+    searchLoading.value = true
+    error.value = null
+    try {
+      if (reset || word !== searchKeyword.value) {
+        search.value = []
+        searchNextUrl.value = null
+        searchKeyword.value = word
+      }
+      const offset = extractOffset(searchNextUrl.value)
+      const res = await searchNovels({
+        word,
+        ...(offset ? { offset } : {}),
+      })
+      search.value = reset ? res.novels : [...search.value, ...res.novels]
+      searchNextUrl.value = res.next_url
+      cacheMetas(res.novels)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        useAuthStore().handle401()
+      }
+      error.value = e instanceof Error ? e.message : '搜索失败'
+    } finally {
+      searchLoading.value = false
     }
   }
 
@@ -106,6 +165,8 @@ export const useNovelStore = defineStore('novel', () => {
     try {
       const res = await getNovelText(id)
       currentText.value = res.novel_text
+      currentIllusts.value = res.illusts
+      currentImages.value = res.images
       return res.novel_text
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -122,17 +183,33 @@ export const useNovelStore = defineStore('novel', () => {
     recommended,
     recommendedNextUrl,
     recommendedLoading,
+    recommendedCachedAt,
     follow,
     followNextUrl,
     followLoading,
+    metaById,
+    getNovelMetaById,
+    search,
+    searchNextUrl,
+    searchLoading,
+    searchKeyword,
     currentText,
+    currentIllusts,
+    currentImages,
     currentTextLoading,
     error,
     loadRecommended,
     loadFollow,
     loadUserNovels,
+    loadSearch,
     loadNovelText,
   }
+}, {
+  persist: {
+    key: 'px-reader-novel',
+    storage: localStorage,
+    pick: ['recommended', 'recommendedNextUrl', 'recommendedCachedAt', 'metaById'],
+  },
 })
 
 /** 从 next_url 中提取 offset 参数 */
