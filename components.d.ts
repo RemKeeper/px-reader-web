@@ -11,6 +11,7 @@ declare module 'vue' {
     EmptyState: typeof import('./src/components/EmptyState.vue')['default']
     NavBar: typeof import('./src/components/NavBar.vue')['default']
     NovelCard: typeof import('./src/components/NovelCard.vue')['default']
+    NovelStats: typeof import('./src/components/NovelStats.vue')['default']
     NovelTags: typeof import('./src/components/NovelTags.vue')['default']
     ReaderContent: typeof import('./src/components/ReaderContent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

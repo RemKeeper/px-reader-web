@@ -53,10 +53,18 @@
                 {{ novel.authorName }}
               </span>
             </div>
+            <NovelStats
+              :text-length="novel.textLength"
+              :bookmarks="novel.totalBookmarks"
+              :views="novel.totalView"
+              size="sm"
+              class="mt-1.5"
+            />
             <NovelTags
               v-if="novel.tags?.length"
               :tags="novel.tags"
               :max="3"
+              expandable
               size="sm"
               class="mt-1.5"
             />
@@ -90,6 +98,7 @@ import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import NovelTags from '@/components/NovelTags.vue'
+import NovelStats from '@/components/NovelStats.vue'
 
 const router = useRouter()
 const shelfStore = useShelfStore()

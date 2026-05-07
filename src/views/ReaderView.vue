@@ -58,9 +58,25 @@
           </span>
           <van-icon name="arrow" size="12" class="text-text-secondary" />
         </div>
+        <NovelStats
+          :text-length="novelMeta.text_length"
+          :bookmarks="novelMeta.total_bookmarks"
+          :views="novelMeta.total_view"
+          :comments="novelMeta.total_comments"
+          size="md"
+          class="mt-3"
+        />
+        <p
+          v-if="novelMeta.caption"
+          class="text-text-secondary text-xs mt-3 leading-relaxed"
+          v-html="novelMeta.caption"
+        />
         <NovelTags
           v-if="novelMeta.tags?.length"
           :tags="novelMeta.tags"
+          :max="6"
+          expandable
+          show-translated
           size="sm"
           class="mt-3"
         />
@@ -294,6 +310,7 @@ import {
 } from '@/utils/novelMarkup'
 import type { TxtChapter, LocalNovelMeta, NovelMeta } from '@/types'
 import NovelTags from '@/components/NovelTags.vue'
+import NovelStats from '@/components/NovelStats.vue'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
