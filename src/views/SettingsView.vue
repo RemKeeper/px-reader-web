@@ -1,8 +1,8 @@
 <template>
-  <div class="settings-view min-h-screen bg-bg">
+  <div class="settings-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar title="设置" />
 
-    <div class="p-4 space-y-4">
+    <div ref="settingsScrollRef" class="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 pb-24 safe-bottom">
       <!-- 账号 -->
       <div class="bg-surface rounded-xl overflow-hidden">
         <van-cell-group :border="false">
@@ -335,7 +335,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import { useAuthStore, useSettingsStore, useBlockStore } from '@/stores'
@@ -353,10 +353,19 @@ const showThemePicker = ref(false)
 const showManualLogin = ref(false)
 const manualToken = ref('')
 const popupViewportTop = ref('50%')
+const settingsScrollRef = ref<HTMLElement | null>(null)
+
+let prevHtmlOverflow = ''
+let prevBodyOverflow = ''
 
 let popupPositionBound = false
 
 function updatePopupViewportTop() {
+  const vv = window.visualViewport
+  if (vv) {
+    popupViewportTop.value = `${window.scrollY + vv.offsetTop + vv.height / 2}px`
+    return
+  }
   popupViewportTop.value = `${Math.max(0, window.scrollY) + window.innerHeight / 2}px`
 }
 
@@ -391,6 +400,16 @@ watch(
 
 onBeforeUnmount(() => {
   unbindPopupPositionEvents()
+  document.documentElement.style.overflow = prevHtmlOverflow
+  document.body.style.overflow = prevBodyOverflow
+})
+
+onMounted(() => {
+  prevHtmlOverflow = document.documentElement.style.overflow
+  prevBodyOverflow = document.body.style.overflow
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
+  settingsScrollRef.value?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
 })
 
 const fontOptions = [
