@@ -93,6 +93,7 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useShelfStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import { getProxiedImageUrl } from '@/api'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
@@ -102,6 +103,8 @@ import NovelStats from '@/components/NovelStats.vue'
 
 const router = useRouter()
 const shelfStore = useShelfStore()
+
+useScrollRestore()
 
 onMounted(() => {
   shelfStore.loadShelf()

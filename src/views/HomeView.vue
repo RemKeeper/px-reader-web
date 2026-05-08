@@ -91,7 +91,8 @@
 import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { useAuthStore, useNovelStore, useBlockStore } from '@/stores'
+import { useAuthStore, useNovelStore, useBlockStore, useSettingsStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
@@ -103,6 +104,9 @@ const router = useRouter()
 const authStore = useAuthStore()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
+const settingsStore = useSettingsStore()
+
+const { isReturnFromSubPage } = useScrollRestore()
 
 // 【诊断】预取登录 URL，点击时同步跳转，避免严格 WebView 丢失用户手势
 const preparedUrl = ref<string | null>(null)
@@ -219,8 +223,15 @@ onMounted(async () => {
 })
 
 onActivated(() => {
-  if (authStore.isLoggedIn) ensureRecommended()
-  else preparePixivLogin()
+  // 从阅读子页面（reader/user）返回时不刷新；其他情况（tab 切换、页面初始化）才执行 5 分钟 TTL 判断
+  if (!authStore.isLoggedIn) {
+    preparePixivLogin()
+    return
+  }
+  if (isReturnFromSubPage.value) return
+  if (settingsStore.settings.autoRefreshFeed ?? true) {
+    ensureRecommended()
+  }
 })
 
 function goToNovel(id: number) {

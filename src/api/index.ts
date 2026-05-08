@@ -379,7 +379,19 @@ function extractNovelFromHtml(html: string): NovelTextResponse | null {
 }
 
 // ── 图片代理 ──────────────────────────────────────────
+// 使用 pimg.rem.asia 公共代理：直接替换 Pixiv 图片域名，无需走自部署 Worker
+const PIMG_PROXY = 'pimg.rem.asia'
+const PIXIV_IMG_HOSTS = ['i.pximg.net', 'i-cf.pximg.net', 's.pximg.net']
 
 export function getProxiedImageUrl(imageUrl: string): string {
-  return `${BASE_URL}/image?url=${encodeURIComponent(imageUrl)}`
+  try {
+    const u = new URL(imageUrl)
+    if (PIXIV_IMG_HOSTS.includes(u.hostname)) {
+      u.hostname = PIMG_PROXY
+      return u.toString()
+    }
+  } catch {
+    // 降级
+  }
+  return imageUrl
 }

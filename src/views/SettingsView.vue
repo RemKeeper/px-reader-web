@@ -85,6 +85,21 @@
               />
             </template>
           </van-cell>
+
+          <van-cell title="自动刷新信息流" center>
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                切换 Tab 或重新进入页面时，若缓存超过 5 分钟则自动刷新；从阅读页返回不触发刷新
+              </span>
+            </template>
+            <template #right-icon>
+              <van-switch
+                :model-value="settings.autoRefreshFeed ?? true"
+                size="20"
+                @update:model-value="settingsStore.updateSettings({ autoRefreshFeed: $event })"
+              />
+            </template>
+          </van-cell>
         </van-cell-group>
       </div>
 

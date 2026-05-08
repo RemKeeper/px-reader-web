@@ -61,9 +61,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onActivated, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore, useNovelStore, useBlockStore } from '@/stores'
+import { useAuthStore, useNovelStore, useBlockStore, useSettingsStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
@@ -75,6 +76,9 @@ const router = useRouter()
 const authStore = useAuthStore()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
+const settingsStore = useSettingsStore()
+
+const { isReturnFromSubPage } = useScrollRestore()
 
 const visibleFollow = computed(() =>
   novelStore.follow.filter((n) => !blockStore.evaluate(n)),
@@ -83,6 +87,17 @@ const visibleFollow = computed(() =>
 onMounted(async () => {
   const loggedIn = await authStore.checkLogin()
   if (loggedIn && novelStore.follow.length === 0) {
+    novelStore.loadFollow(true)
+  }
+})
+
+onActivated(() => {
+  // 从阅读子页面返回时不刷新
+  if (isReturnFromSubPage.value) return
+  if (!authStore.isLoggedIn) return
+  if (!(settingsStore.settings.autoRefreshFeed ?? true)) return
+  // 工层动态内容没有客户端 TTL 机制，遗公动态每次激活就重载更合适
+  if (novelStore.follow.length > 0) {
     novelStore.loadFollow(true)
   }
 })

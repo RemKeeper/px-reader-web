@@ -90,6 +90,8 @@ export interface ReaderSettings {
   hdrBrightness?: number
   /** HDR 模式：暖色滤镜强度 0-100，0=关闭 */
   hdrWarmFilter?: number
+  /** 是否在「重新激活信息流」时自动刷新（5 分钟 TTL） */
+  autoRefreshFeed?: boolean
 }
 
 /** TXT 文件缓存 */

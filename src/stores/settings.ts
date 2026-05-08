@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   hdrEyeCare: false,
   hdrBrightness: 100,
   hdrWarmFilter: 0,
+  autoRefreshFeed: true,
 }
 
 export const useSettingsStore = defineStore(
