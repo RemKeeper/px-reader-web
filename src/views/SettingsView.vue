@@ -241,8 +241,16 @@
     </div>
 
     <!-- 字体选择 -->
-    <van-action-sheet v-model:show="showFontPicker" title="选择字体" teleport="body">
-      <div class="p-4 space-y-2">
+    <van-popup
+      v-model:show="showFontPicker"
+      teleport="body"
+      round
+      closeable
+      class="center-modal"
+      :style="{ width: '92vw', maxWidth: '460px' }"
+    >
+      <div class="center-modal__header">选择字体</div>
+      <div class="p-4 pt-2 space-y-2 center-modal__content">
         <van-button
           v-for="f in fontOptions"
           :key="f.value"
@@ -253,11 +261,19 @@
           {{ f.label }}
         </van-button>
       </div>
-    </van-action-sheet>
+    </van-popup>
 
     <!-- 主题选择 -->
-    <van-action-sheet v-model:show="showThemePicker" title="选择主题" teleport="body">
-      <div class="p-4 space-y-2">
+    <van-popup
+      v-model:show="showThemePicker"
+      teleport="body"
+      round
+      closeable
+      class="center-modal"
+      :style="{ width: '92vw', maxWidth: '460px' }"
+    >
+      <div class="center-modal__header">选择主题</div>
+      <div class="p-4 pt-2 space-y-2 center-modal__content">
         <van-button
           v-for="t in themeOptions"
           :key="t.value"
@@ -268,17 +284,20 @@
           {{ t.label }}
         </van-button>
       </div>
-    </van-action-sheet>
+    </van-popup>
 
     <!-- 手动填写 refresh_token -->
-    <van-action-sheet
+    <van-popup
       v-model:show="showManualLogin"
-      title="手动登录"
       teleport="body"
-      class-name="manual-login-sheet"
+      round
+      closeable
+      class="manual-login-sheet center-modal"
+      :style="{ width: '92vw', maxWidth: '560px' }"
       :lock-scroll="false"
     >
-      <div class="p-4 space-y-3 manual-login-sheet__content">
+      <div class="center-modal__header">手动登录</div>
+      <div class="p-4 pt-2 space-y-3 manual-login-sheet__content center-modal__content">
         <div class="bg-orange-500/10 border border-orange-500/40 rounded-lg p-3 text-xs leading-relaxed text-text">
           <p class="font-medium mb-1">使用说明</p>
           <p class="text-text-secondary">
@@ -309,7 +328,7 @@
           </van-button>
         </div>
       </div>
-    </van-action-sheet>
+    </van-popup>
 
     <TabBar />
   </div>

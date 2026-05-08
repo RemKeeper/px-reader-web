@@ -228,8 +228,16 @@
     </transition>
 
     <!-- 设置面板 -->
-    <van-action-sheet v-model:show="showSettings" title="阅读设置">
-      <div class="p-4 space-y-5">
+    <van-popup
+      v-model:show="showSettings"
+      teleport="body"
+      round
+      closeable
+      class="center-modal reader-settings-modal"
+      :style="{ width: '92vw', maxWidth: '720px' }"
+    >
+      <div class="center-modal__header">阅读设置</div>
+      <div class="p-4 pt-2 space-y-5 center-modal__content">
         <!-- 字号 -->
         <div>
           <div class="flex-between mb-2">
@@ -293,15 +301,30 @@
           </div>
         </div>
       </div>
-    </van-action-sheet>
+    </van-popup>
 
     <!-- 菜单 -->
-    <van-action-sheet
+    <van-popup
       v-model:show="showMenu"
-      :actions="menuActions"
-      cancel-text="取消"
-      @select="onMenuSelect"
-    />
+      teleport="body"
+      round
+      closeable
+      class="center-modal"
+      :style="{ width: '86vw', maxWidth: '420px' }"
+    >
+      <div class="center-modal__header">菜单</div>
+      <div class="p-4 pt-2 space-y-2 center-modal__content">
+        <van-button
+          v-for="action in menuActions"
+          :key="action.value"
+          block
+          @click="onMenuSelect(action)"
+        >
+          {{ action.name }}
+        </van-button>
+        <van-button block plain @click="showMenu = false">取消</van-button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -410,7 +433,7 @@ watch(() => content.value, () => tokensCache.clear())
 
 function onContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  if (target.closest('.van-nav-bar') || target.closest('.van-action-sheet')) return
+  if (target.closest('.van-nav-bar') || target.closest('.van-popup')) return
   showControls.value = !showControls.value
 }
 

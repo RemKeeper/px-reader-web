@@ -181,27 +181,39 @@ img {
   background: var(--color-surface) !important;
 }
 
-/* 手动登录弹层：兼容 Android System WebView（Via 等）键盘与视口计算异常 */
-.manual-login-sheet {
-  position: fixed !important;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-height: 88vh !important;
-  max-height: 88dvh !important;
+/* 居中弹窗通用样式 */
+.center-modal {
+  max-height: 88vh;
+  max-height: 88dvh;
   display: flex;
   flex-direction: column;
+  background: var(--color-surface) !important;
+}
+
+.center-modal__header {
+  padding: 14px 16px 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.center-modal__content {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reader-settings-modal .center-modal__content {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
 }
 
 .manual-login-sheet__content {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
 }
 
 @supports not (height: 100dvh) {
-  .manual-login-sheet {
-    max-height: 88vh !important;
+  .center-modal {
+    max-height: 88vh;
   }
 }
 
