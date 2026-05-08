@@ -241,7 +241,7 @@
     </div>
 
     <!-- 字体选择 -->
-    <van-action-sheet v-model:show="showFontPicker" title="选择字体">
+    <van-action-sheet v-model:show="showFontPicker" title="选择字体" teleport="body">
       <div class="p-4 space-y-2">
         <van-button
           v-for="f in fontOptions"
@@ -256,7 +256,7 @@
     </van-action-sheet>
 
     <!-- 主题选择 -->
-    <van-action-sheet v-model:show="showThemePicker" title="选择主题">
+    <van-action-sheet v-model:show="showThemePicker" title="选择主题" teleport="body">
       <div class="p-4 space-y-2">
         <van-button
           v-for="t in themeOptions"
@@ -271,7 +271,7 @@
     </van-action-sheet>
 
     <!-- 手动填写 refresh_token -->
-    <van-action-sheet v-model:show="showManualLogin" title="手动登录">
+    <van-action-sheet v-model:show="showManualLogin" title="手动登录" teleport="body">
       <div class="p-4 space-y-3">
         <div class="bg-orange-500/10 border border-orange-500/40 rounded-lg p-3 text-xs leading-relaxed text-text">
           <p class="font-medium mb-1">使用说明</p>
