@@ -271,8 +271,14 @@
     </van-action-sheet>
 
     <!-- 手动填写 refresh_token -->
-    <van-action-sheet v-model:show="showManualLogin" title="手动登录" teleport="body">
-      <div class="p-4 space-y-3">
+    <van-action-sheet
+      v-model:show="showManualLogin"
+      title="手动登录"
+      teleport="body"
+      class-name="manual-login-sheet"
+      :lock-scroll="false"
+    >
+      <div class="p-4 space-y-3 manual-login-sheet__content">
         <div class="bg-orange-500/10 border border-orange-500/40 rounded-lg p-3 text-xs leading-relaxed text-text">
           <p class="font-medium mb-1">使用说明</p>
           <p class="text-text-secondary">
@@ -287,6 +293,7 @@
           autosize
           placeholder="貌似： XxXxXxXx-xxxxxxxxxxxxxxxxxxxxxx"
           :disabled="authStore.loading"
+          @focus="onManualTokenFocus"
         />
         <div class="flex gap-2">
           <van-button block plain @click="showManualLogin = false">取消</van-button>
@@ -396,5 +403,14 @@ async function onLogout() {
   } catch {
     // 取消
   }
+}
+
+function onManualTokenFocus(event: Event) {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  // 兼容 Android WebView：键盘弹出后主动把输入区滚动到可视区域
+  window.setTimeout(() => {
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, 180)
 }
 </script>
