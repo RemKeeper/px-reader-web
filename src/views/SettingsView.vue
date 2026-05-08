@@ -246,8 +246,8 @@
       teleport="body"
       round
       closeable
-      class="center-modal"
-      :style="{ width: '92vw', maxWidth: '460px' }"
+      class="center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '460px', top: popupViewportTop }"
     >
       <div class="center-modal__header">选择字体</div>
       <div class="p-4 pt-2 space-y-2 center-modal__content">
@@ -269,8 +269,8 @@
       teleport="body"
       round
       closeable
-      class="center-modal"
-      :style="{ width: '92vw', maxWidth: '460px' }"
+      class="center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '460px', top: popupViewportTop }"
     >
       <div class="center-modal__header">选择主题</div>
       <div class="p-4 pt-2 space-y-2 center-modal__content">
@@ -292,8 +292,8 @@
       teleport="body"
       round
       closeable
-      class="manual-login-sheet center-modal"
-      :style="{ width: '92vw', maxWidth: '560px' }"
+      class="manual-login-sheet center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '560px', top: popupViewportTop }"
       :lock-scroll="false"
     >
       <div class="center-modal__header">手动登录</div>
@@ -335,7 +335,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import { useAuthStore, useSettingsStore, useBlockStore } from '@/stores'
@@ -352,6 +352,46 @@ const showFontPicker = ref(false)
 const showThemePicker = ref(false)
 const showManualLogin = ref(false)
 const manualToken = ref('')
+const popupViewportTop = ref('50%')
+
+let popupPositionBound = false
+
+function updatePopupViewportTop() {
+  popupViewportTop.value = `${Math.max(0, window.scrollY) + window.innerHeight / 2}px`
+}
+
+function bindPopupPositionEvents() {
+  if (popupPositionBound) return
+  popupPositionBound = true
+  window.addEventListener('scroll', updatePopupViewportTop, { passive: true })
+  window.addEventListener('resize', updatePopupViewportTop)
+  window.visualViewport?.addEventListener('resize', updatePopupViewportTop)
+}
+
+function unbindPopupPositionEvents() {
+  if (!popupPositionBound) return
+  popupPositionBound = false
+  window.removeEventListener('scroll', updatePopupViewportTop)
+  window.removeEventListener('resize', updatePopupViewportTop)
+  window.visualViewport?.removeEventListener('resize', updatePopupViewportTop)
+}
+
+watch(
+  () => [showFontPicker.value, showThemePicker.value, showManualLogin.value],
+  (flags) => {
+    const visible = flags.some(Boolean)
+    if (visible) {
+      updatePopupViewportTop()
+      bindPopupPositionEvents()
+      return
+    }
+    unbindPopupPositionEvents()
+  },
+)
+
+onBeforeUnmount(() => {
+  unbindPopupPositionEvents()
+})
 
 const fontOptions = [
   { label: '黑体 (Noto Sans SC)', value: 'sans' },
