@@ -1,7 +1,12 @@
 <template>
   <div
     id="px-reader"
-    :class="[`theme-${settingsStore.settings.theme}`, { 'hdr-eye-care': settingsStore.settings.hdrEyeCare }]"
+    :class="[
+      `theme-${settingsStore.settings.theme}`,
+      { 'hdr-eye-care': settingsStore.settings.hdrEyeCare },
+      { 'oled-extreme-black': settingsStore.settings.hdrEyeCare && settingsStore.settings.oledExtremeBlack },
+    ]"
+    :style="oledCssVars"
   >
     <router-view v-slot="{ Component }">
       <transition name="page-fade" mode="out-in">
@@ -27,12 +32,26 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, computed } from 'vue'
 import { useSettingsStore } from '@/stores'
 
 const settingsStore = useSettingsStore()
 
 const keepAlivePages = ['HomeView', 'ShelfView', 'FollowView']
+
+/** OLED 极端黑色模式：将文字/边框亮度作为 CSS 变量注入，由 CSS 消费 */
+const oledCssVars = computed(() => {
+  const s = settingsStore.settings
+  if (!s.hdrEyeCare || !s.oledExtremeBlack) return {}
+  const b = s.oledTextBrightness ?? 80
+  const bSec = Math.round(b * 0.55)
+  const bBorder = Math.round(b * 0.22)
+  return {
+    '--oled-text-color': `hsl(0, 0%, ${b}%)`,
+    '--oled-text-secondary-color': `hsl(0, 0%, ${bSec}%)`,
+    '--oled-border-color': `hsl(0, 0%, ${bBorder}%)`,
+  }
+})
 
 // 把主题 class 同步到 <html>，让 teleport 到 body 的 Vant 弹层也能继承 CSS 变量
 watch(
@@ -50,6 +69,23 @@ watch(
   () => settingsStore.settings.hdrEyeCare,
   (on) => {
     document.documentElement.classList.toggle('hdr-eye-care', !!on)
+  },
+  { immediate: true },
+)
+
+// 同步 OLED 极端黑色 class + CSS 变量到 <html>，确保 teleport 弹层也生效
+watch(
+  () => oledCssVars.value,
+  (vars) => {
+    const html = document.documentElement
+    const active = Object.keys(vars).length > 0
+    html.classList.toggle('oled-extreme-black', active)
+    const keys = ['--oled-text-color', '--oled-text-secondary-color', '--oled-border-color'] as const
+    if (active) {
+      keys.forEach((k) => html.style.setProperty(k, (vars as Record<string, string>)[k] ?? ''))
+    } else {
+      keys.forEach((k) => html.style.removeProperty(k))
+    }
   },
   { immediate: true },
 )

@@ -40,6 +40,22 @@ html.hdr-eye-care .theme-sepia {
   --color-text: #4a4030;
 }
 
+/* OLED 极端黑色模式：背景纯黑（像素不发光），文字/边框亮度由 JS 注入 CSS 变量控制 */
+/* 使用与 hdr-eye-care 相同的后代选择器模式（特异性 0,2,1），且在其后出现，确保覆盖 */
+.oled-extreme-black.theme-dark,
+.oled-extreme-black.theme-light,
+.oled-extreme-black.theme-sepia,
+html.oled-extreme-black .theme-dark,
+html.oled-extreme-black .theme-light,
+html.oled-extreme-black .theme-sepia,
+html.oled-extreme-black {
+  --color-bg: #000000;
+  --color-surface: #000000;
+  --color-text: var(--oled-text-color, #cccccc);
+  --color-text-secondary: var(--oled-text-secondary-color, #707070);
+  --color-border: var(--oled-border-color, #383838);
+}
+
 /* 深色主题 (默认) */
 .theme-dark {
   --color-bg: #0f0f23;

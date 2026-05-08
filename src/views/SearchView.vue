@@ -1,12 +1,12 @@
 <template>
-  <div class="search-view min-h-screen bg-bg">
+  <div class="search-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar :title="title">
       <template #left>
         <van-icon name="arrow-left" size="20" class="text-text" @click="goBack" />
       </template>
     </NavBar>
 
-    <div class="p-3">
+    <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain p-3 pb-24 safe-bottom">
       <van-search
         v-model="word"
         placeholder="输入关键词或标签"
@@ -57,6 +57,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNovelStore, useBlockStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
@@ -67,6 +68,12 @@ const route = useRoute()
 const router = useRouter()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
+const scrollRef = ref<HTMLElement | null>(null)
+
+useScrollRestore({
+  scrollElRef: scrollRef,
+  lockBodyScroll: true,
+})
 
 const word = ref('')
 const listLoading = ref(false)

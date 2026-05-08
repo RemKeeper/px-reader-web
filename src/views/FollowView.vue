@@ -1,8 +1,9 @@
 <template>
-  <div class="follow-view min-h-screen bg-bg">
+  <div class="follow-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar title="关注动态" />
 
-    <div v-if="!authStore.isLoggedIn" class="p-4">
+    <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain p-3 pb-24 safe-bottom">
+      <div v-if="!authStore.isLoggedIn" class="p-1">
       <div class="bg-surface rounded-xl p-6 text-center">
         <van-icon name="friends-o" size="48" class="text-primary mb-3" />
         <p class="text-text mb-4">登录后查看关注作者的最新小说</p>
@@ -15,7 +16,7 @@
       </div>
     </div>
 
-    <div v-else class="p-3">
+      <div v-else>
       <div v-if="novelStore.follow.length === 0 && novelStore.followLoading" class="py-12">
         <van-loading type="spinner" color="var(--color-primary)" class="flex-center" />
       </div>
@@ -54,6 +55,7 @@
           <span v-else class="text-text-secondary text-sm">没有更多了</span>
         </div>
       </template>
+      </div>
     </div>
 
     <TabBar />
@@ -61,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted } from 'vue'
+import { computed, onActivated, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore, useNovelStore, useBlockStore, useSettingsStore } from '@/stores'
 import { useScrollRestore } from '@/composables'
@@ -77,8 +79,12 @@ const authStore = useAuthStore()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
 const settingsStore = useSettingsStore()
+const scrollRef = ref<HTMLElement | null>(null)
 
-const { isReturnFromSubPage } = useScrollRestore()
+const { isReturnFromSubPage } = useScrollRestore({
+  scrollElRef: scrollRef,
+  lockBodyScroll: true,
+})
 
 const visibleFollow = computed(() =>
   novelStore.follow.filter((n) => !blockStore.evaluate(n)),

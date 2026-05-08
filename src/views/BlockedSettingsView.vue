@@ -1,8 +1,8 @@
 <template>
-  <div class="blocked-settings min-h-screen bg-bg">
+  <div class="blocked-settings h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar title="屏蔽管理" show-back />
 
-    <div class="p-4 space-y-4">
+    <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 pb-8 safe-bottom">
       <!-- 屏蔽作者 -->
       <div class="bg-surface rounded-xl overflow-hidden">
         <van-cell-group :border="false" :title="`屏蔽作者 (${blockStore.blockedAuthors.length})`">
@@ -137,12 +137,19 @@
 import { ref } from 'vue'
 import { showToast } from 'vant'
 import { useBlockStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import NavBar from '@/components/NavBar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 const blockStore = useBlockStore()
+const scrollRef = ref<HTMLElement | null>(null)
 const newTag = ref('')
 const newTagSub = ref('')
+
+useScrollRestore({
+  scrollElRef: scrollRef,
+  lockBodyScroll: true,
+})
 
 function addTag() {
   const t = newTag.value.trim()

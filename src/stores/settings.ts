@@ -14,6 +14,8 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   hdrEyeCare: false,
   hdrBrightness: 100,
   hdrWarmFilter: 0,
+  oledExtremeBlack: false,
+  oledTextBrightness: 80,
   autoRefreshFeed: true,
 }
 

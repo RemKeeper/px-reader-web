@@ -164,10 +164,48 @@
               </div>
             </template>
           </van-cell>
+          <van-cell
+            v-if="settings.hdrEyeCare"
+            title="OLED 极端黑色模式"
+            center
+          >
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                进阶：背景纯黑（像素不发光），文字/边框亮度可调；在暖色滤镜与亮度限制的基础上进一步降低 OLED 屏能耗与眼疲劳
+              </span>
+            </template>
+            <template #right-icon>
+              <van-switch
+                :model-value="!!settings.oledExtremeBlack"
+                size="20"
+                @update:model-value="settingsStore.updateSettings({ oledExtremeBlack: $event })"
+              />
+            </template>
+          </van-cell>
+          <van-cell
+            v-if="settings.hdrEyeCare && settings.oledExtremeBlack"
+            title="文字/UI 亮度"
+            :value="`${settings.oledTextBrightness ?? 80}%`"
+          >
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                100% = 纯白，0% = 纯黑（不可见）；建议 60–85% 舒适阅读
+              </span>
+            </template>
+            <template #right-icon>
+              <div class="w-32 ml-2">
+                <van-slider
+                  :model-value="settings.oledTextBrightness ?? 80"
+                  :min="0"
+                  :max="100"
+                  :step="5"
+                  @update:model-value="(v) => settingsStore.updateSettings({ oledTextBrightness: Number(v) })"
+                />
+              </div>
+            </template>
+          </van-cell>
         </van-cell-group>
       </div>
-
-      <!-- 数据管理 -->
       <div class="bg-surface rounded-xl overflow-hidden">
         <van-cell-group :border="false" title="数据管理">
           <van-cell

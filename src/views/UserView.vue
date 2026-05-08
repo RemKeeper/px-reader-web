@@ -1,7 +1,8 @@
 <template>
-  <div class="user-view min-h-screen bg-bg">
+  <div class="user-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar :title="userName || '用户主页'" show-back />
 
+    <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain pb-8 safe-bottom">
     <!-- 用户信息 -->
     <div v-if="userInfo" class="bg-surface p-4 flex items-center gap-4">
       <img
@@ -64,6 +65,7 @@
         </div>
       </template>
     </div>
+    </div>
   </div>
 </template>
 
@@ -72,6 +74,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useNovelStore, useBlockStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import { getProxiedImageUrl } from '@/api'
 import type { NovelMeta, PixivUser } from '@/types'
 import NavBar from '@/components/NavBar.vue'
@@ -83,6 +86,12 @@ const props = defineProps<{ id: string }>()
 const router = useRouter()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
+const scrollRef = ref<HTMLElement | null>(null)
+
+useScrollRestore({
+  scrollElRef: scrollRef,
+  lockBodyScroll: true,
+})
 
 const loading = ref(true)
 const loadingMore = ref(false)

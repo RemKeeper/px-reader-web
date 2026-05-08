@@ -1,8 +1,8 @@
 <template>
-  <div class="import-view min-h-screen bg-bg">
+  <div class="import-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar title="导入 TXT" show-back />
 
-    <div class="p-4 space-y-4">
+    <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 pb-8 safe-bottom">
       <!-- 上传区域 -->
       <div
         class="bg-surface rounded-xl p-8 text-center border-2 border-dashed border-border cursor-pointer transition-colors hover:border-primary"
@@ -87,6 +87,7 @@ import { showToast } from 'vant'
 import { splitChaptersInWorker, decodeTextInWorker } from '@/workers'
 import { saveTxtCache, getAllTxtCaches, removeTxtCache } from '@/db'
 import { useSettingsStore, useShelfStore } from '@/stores'
+import { useScrollRestore } from '@/composables'
 import type { TxtFileCache, LocalNovelMeta } from '@/types'
 import NavBar from '@/components/NavBar.vue'
 
@@ -94,11 +95,17 @@ const router = useRouter()
 const settingsStore = useSettingsStore()
 const shelfStore = useShelfStore()
 
+const scrollRef = ref<HTMLElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const processing = ref(false)
 const processingStatus = ref('')
 const imported = ref<TxtFileCache | null>(null)
 const txtList = ref<TxtFileCache[]>([])
+
+useScrollRestore({
+  scrollElRef: scrollRef,
+  lockBodyScroll: true,
+})
 
 function triggerUpload() {
   fileInput.value?.click()

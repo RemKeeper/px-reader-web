@@ -1,13 +1,14 @@
 <template>
-  <div class="home-view min-h-screen bg-bg">
+  <div class="home-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar title="PX-Reader">
       <template #right>
         <van-icon name="search" size="20" class="text-text" />
       </template>
     </NavBar>
 
+    <div ref="scrollRef" class="flex-1 overflow-y-auto overscroll-contain p-3 pb-24 safe-bottom">
     <!-- 未登录提示 -->
-    <div v-if="!authStore.isLoggedIn" class="p-4">
+    <div v-if="!authStore.isLoggedIn" class="p-1">
       <div class="bg-surface rounded-xl p-6 text-center">
         <van-icon name="user-o" size="48" class="text-primary mb-3" />
         <p class="text-text mb-4">登录 Pixiv 账号以获取推荐小说</p>
@@ -29,7 +30,7 @@
     </div>
 
     <!-- 推荐列表 -->
-    <div v-else class="p-3">
+    <div v-else>
       <div class="flex items-center justify-between mb-3 px-1">
         <h2 class="text-text text-base font-bold">推荐小说</h2>
         <div class="flex items-center gap-2">
@@ -82,6 +83,7 @@
         </van-list>
       </van-pull-refresh>
     </div>
+    </div>
 
     <TabBar />
   </div>
@@ -105,8 +107,12 @@ const authStore = useAuthStore()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
 const settingsStore = useSettingsStore()
+const scrollRef = ref<HTMLElement | null>(null)
 
-const { isReturnFromSubPage } = useScrollRestore()
+const { isReturnFromSubPage } = useScrollRestore({
+  scrollElRef: scrollRef,
+  lockBodyScroll: true,
+})
 
 // 【诊断】预取登录 URL，点击时同步跳转，避免严格 WebView 丢失用户手势
 const preparedUrl = ref<string | null>(null)
