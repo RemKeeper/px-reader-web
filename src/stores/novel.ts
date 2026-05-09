@@ -36,6 +36,8 @@ export const useNovelStore = defineStore('novel', () => {
   const follow = ref<NovelMeta[]>([])
   const followNextUrl = ref<string | null>(null)
   const followLoading = ref(false)
+  /** 关注缓存时间戳（ms） */
+  const followCachedAt = ref<number>(0)
 
   /** 当前小说正文 */
   const currentText = ref('')
@@ -94,6 +96,7 @@ export const useNovelStore = defineStore('novel', () => {
       })
       follow.value = reset ? res.novels : [...follow.value, ...res.novels]
       followNextUrl.value = res.next_url
+      followCachedAt.value = Date.now()
       cacheMetas(res.novels)
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -187,6 +190,7 @@ export const useNovelStore = defineStore('novel', () => {
     follow,
     followNextUrl,
     followLoading,
+    followCachedAt,
     metaById,
     getNovelMetaById,
     search,
@@ -208,7 +212,7 @@ export const useNovelStore = defineStore('novel', () => {
   persist: {
     key: 'px-reader-novel',
     storage: localStorage,
-    pick: ['recommended', 'recommendedNextUrl', 'recommendedCachedAt', 'metaById'],
+    pick: ['recommended', 'recommendedNextUrl', 'recommendedCachedAt', 'follow', 'followNextUrl', 'followCachedAt', 'metaById'],
   },
 })
 

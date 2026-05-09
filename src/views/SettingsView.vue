@@ -143,7 +143,7 @@
             </template>
           </van-cell>
           <van-cell
-            v-if="settings.hdrEyeCare"
+            v-if="settings.hdrEyeCare && !settings.oledExtremeBlack"
             title="暖色滤镜"
             :value="`${settings.hdrWarmFilter ?? 0}%`"
           >
@@ -433,6 +433,16 @@ watch(
       return
     }
     unbindPopupPositionEvents()
+  },
+)
+
+// 当启用 OLED 极端黑色模式时，自动关闭暖色滤镜以避免橙色闪烁
+watch(
+  () => settings.value.oledExtremeBlack,
+  (enabled) => {
+    if (enabled && settings.value.hdrWarmFilter && settings.value.hdrWarmFilter > 0) {
+      settingsStore.updateSettings({ hdrWarmFilter: 0 })
+    }
   },
 )
 
