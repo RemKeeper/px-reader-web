@@ -40,6 +40,8 @@
       class="reader-body h-screen overflow-y-auto"
       :style="settingsStore.cssVars"
       @click="onContentClick"
+      @contextmenu.prevent="onContextMenu"
+      @scroll="updateProgress"
     >
       <!-- 作品信息头 -->
       <div v-if="novelMeta" class="bg-surface px-4 pt-6 pb-4 border-b border-border">
@@ -325,6 +327,119 @@
         <van-button block plain @click="showMenu = false">取消</van-button>
       </div>
     </van-popup>
+
+    <!-- 右键菜单 - 未选中文字：快捷阅读设置 -->
+    <teleport to="body">
+      <div
+        v-if="showContextMenu && !hasSelection"
+        class="context-menu-overlay"
+        @click="closeContextMenu"
+      >
+        <div
+          class="context-menu-panel"
+          :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }"
+          @click.stop
+        >
+          <div class="context-menu-section">
+            <span class="context-menu-label">字号</span>
+            <div class="flex items-center gap-2">
+              <van-button
+                size="small"
+                icon="minus"
+                :disabled="settingsStore.settings.fontSize <= 12"
+                @click="adjustFontSize(-1)"
+              />
+              <span class="text-sm text-text font-medium w-10 text-center">
+                {{ settingsStore.settings.fontSize }}
+              </span>
+              <van-button
+                size="small"
+                icon="plus"
+                :disabled="settingsStore.settings.fontSize >= 32"
+                @click="adjustFontSize(1)"
+              />
+            </div>
+          </div>
+          <div class="context-menu-section">
+            <span class="context-menu-label">字体</span>
+            <div class="flex gap-1">
+              <button
+                v-for="f in fontOptions"
+                :key="f.value"
+                class="ctx-font-btn"
+                :class="{ active: settingsStore.settings.fontFamily === f.value }"
+                @click="settingsStore.updateSettings({ fontFamily: f.value as any })"
+              >
+                {{ f.label }}
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-section">
+            <span class="context-menu-label">主题</span>
+            <div class="flex gap-2">
+              <div
+                v-for="t in themeOptions"
+                :key="t.value"
+                class="ctx-theme-dot"
+                :class="{ active: settingsStore.settings.theme === t.value }"
+                :style="{ backgroundColor: t.color }"
+                :title="t.label"
+                @click="settingsStore.updateSettings({ theme: t.value as any })"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- 右键菜单 - 已选中文字：文本处理 -->
+    <teleport to="body">
+      <div
+        v-if="showContextMenu && hasSelection"
+        class="context-menu-overlay"
+        @click="closeContextMenu"
+      >
+        <div
+          class="context-menu-panel"
+          :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }"
+          @click.stop
+        >
+          <div class="context-menu-section">
+            <span class="text-xs text-text-secondary truncate max-w-48 mb-2 block">
+              已选中: "{{ truncatedSelection }}"
+            </span>
+          </div>
+          <button class="ctx-action-btn" @click="openReplaceDialog">
+            <van-icon name="exchange" size="16" />
+            <span>替换</span>
+          </button>
+          <button class="ctx-action-btn ctx-action-btn--danger" @click="confirmRemoveSelection">
+            <van-icon name="delete-o" size="16" />
+            <span>剔除</span>
+          </button>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- 替换对话框 -->
+    <van-dialog
+      v-model:show="showReplaceDialog"
+      title="替换文本"
+      show-cancel-button
+      :before-close="onReplaceConfirm"
+    >
+      <div class="p-4">
+        <div class="text-xs text-text-secondary mb-2">
+          将文中所有 "<span class="text-primary">{{ truncatedSelection }}</span>" 替换为:
+        </div>
+        <input
+          v-model="replaceInput"
+          class="ctx-replace-input"
+          placeholder="输入替换后的文本（留空即剔除）"
+          @keyup.enter="onReplaceConfirm('confirm')"
+        />
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -366,6 +481,89 @@ const activeChapter = ref(0)
 const isInShelf = ref(false)
 const contentRef = ref<HTMLElement | null>(null)
 const chapterRefs = ref<Map<number, HTMLElement>>(new Map())
+
+// ── 右键菜单 ─────────────────────────────────────────
+const showContextMenu = ref(false)
+const contextMenuPos = ref({ x: 0, y: 0 })
+const selectedText = ref('')
+const hasSelection = ref(false)
+const showReplaceDialog = ref(false)
+const replaceInput = ref('')
+
+const truncatedSelection = computed(() => {
+  const s = selectedText.value
+  return s.length > 30 ? s.slice(0, 30) + '...' : s
+})
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  const sel = window.getSelection()
+  const text = sel?.toString().trim() || ''
+  selectedText.value = text
+  hasSelection.value = text.length > 0
+
+  // 调整菜单位置，确保不超出视口
+  const menuW = 220
+  const menuH = hasSelection.value ? 140 : 200
+  let x = e.clientX
+  let y = e.clientY
+  if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
+  if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
+  contextMenuPos.value = { x, y }
+  showContextMenu.value = true
+}
+
+function closeContextMenu() {
+  showContextMenu.value = false
+}
+
+function adjustFontSize(delta: number) {
+  const fs = settingsStore.settings.fontSize + delta
+  settingsStore.updateSettings({ fontSize: Math.max(12, Math.min(32, fs)) })
+}
+
+function openReplaceDialog() {
+  showReplaceDialog.value = true
+  replaceInput.value = ''
+  closeContextMenu()
+}
+
+async function onReplaceConfirm(action: 'confirm' | 'cancel') {
+  if (action === 'cancel') {
+    showReplaceDialog.value = false
+    return true
+  }
+  const search = selectedText.value
+  if (!search) {
+    showReplaceDialog.value = false
+    return true
+  }
+  const replacement = replaceInput.value
+  // 替换全文（包含 token 标记的原始文本）
+  content.value = content.value.split(search).join(replacement)
+  tokensCache.clear()
+  // 重新分章
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  showReplaceDialog.value = false
+  showToast(`已替换 ${content.value.split(replacement).length - 1} 处`)
+  return true
+}
+
+function confirmRemoveSelection() {
+  const search = selectedText.value
+  if (!search) return
+  // 剔除：将所有选中文本替换为空
+  content.value = content.value.split(search).join('')
+  tokensCache.clear()
+  splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars).then((result) => {
+    chapters.value = result.chapters
+    hasNaturalChapters.value = result.hasNaturalSplits
+  })
+  closeContextMenu()
+  showToast(`已剔除 ${search.length} 字符`)
+}
 
 /** 当前作品元信息（从 store 缓存获取） */
 const novelMeta = ref<NovelMeta | null>(null)
@@ -584,9 +782,6 @@ onMounted(async () => {
     }, 100)
   }
 
-  // 绑定滚动事件
-  contentRef.value?.addEventListener('scroll', updateProgress, { passive: true })
-
   // 定时保存进度
   const saveTimer = setInterval(saveCurrentProgress, 5000)
   window.addEventListener('beforeunload', saveCurrentProgress)
@@ -622,5 +817,120 @@ onMounted(async () => {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ── 右键菜单 ─────────────────────────────────────── */
+.context-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: transparent;
+}
+
+.context-menu-panel {
+  position: fixed;
+  z-index: 3001;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  padding: 8px 0;
+  min-width: 200px;
+  max-width: 240px;
+  backdrop-filter: blur(12px);
+}
+
+.context-menu-section {
+  padding: 6px 14px;
+}
+
+.context-menu-section + .context-menu-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.context-menu-label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ctx-font-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ctx-font-btn.active,
+.ctx-font-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.ctx-theme-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.ctx-theme-dot.active,
+.ctx-theme-dot:hover {
+  border-color: var(--color-primary);
+  transform: scale(1.15);
+}
+
+.ctx-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+}
+
+.ctx-action-btn:hover {
+  background: var(--color-bg);
+}
+
+.ctx-action-btn--danger {
+  color: #e74c3c;
+}
+
+.ctx-action-btn--danger:hover {
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.ctx-replace-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ctx-replace-input:focus {
+  border-color: var(--color-primary);
 }
 </style>
