@@ -204,6 +204,47 @@
               </div>
             </template>
           </van-cell>
+          <van-cell
+            v-if="settings.hdrEyeCare && settings.oledExtremeBlack"
+            title="单独设置光标亮度"
+            center
+          >
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                开启后鼠标光标不再跟随文字/UI 亮度，可单独调暗或调亮
+              </span>
+            </template>
+            <template #right-icon>
+              <van-switch
+                :model-value="!!settings.oledCursorBrightnessEnabled"
+                size="20"
+                @update:model-value="settingsStore.updateSettings({ oledCursorBrightnessEnabled: $event })"
+              />
+            </template>
+          </van-cell>
+          <van-cell
+            v-if="settings.hdrEyeCare && settings.oledExtremeBlack && settings.oledCursorBrightnessEnabled"
+            title="光标亮度"
+            :value="`${settings.oledCursorBrightness ?? settings.oledTextBrightness ?? 80}%`"
+          >
+            <template #label>
+              <span class="text-xs text-text-secondary">
+                100% = 纯白，0% = 纯黑（不可见）；仅影响鼠标光标
+              </span>
+            </template>
+            <template #right-icon>
+              <div class="w-32 ml-2">
+                <van-slider
+                  :model-value="settings.oledCursorBrightness ?? settings.oledTextBrightness ?? 80"
+                  :min="0"
+                  :max="100"
+                  :step="5"
+                  @update:model-value="(v) => settingsStore.updateSettings({ oledCursorBrightness: Number(v) })"
+                />
+              </div>
+            </template>
+          </van-cell>
+
         </van-cell-group>
       </div>
       <div class="bg-surface rounded-xl overflow-hidden">

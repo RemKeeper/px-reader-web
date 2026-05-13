@@ -10,14 +10,19 @@
     :border="false"
     :style="{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }"
   >
-    <template v-if="$slots.right" #right>
+    <template #right>
+      <span class="fullscreen-btn hidden md:inline-block mr-2" @click.stop="toggleFullscreen">
+        <van-icon :name="isFullscreen ? 'shrink' : 'expand-o'" size="18" class="text-text align-middle" />
+      </span>
       <slot name="right" />
     </template>
   </van-nav-bar>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { showToast } from 'vant'
 
 withDefaults(
   defineProps<{
@@ -31,6 +36,7 @@ withDefaults(
 )
 
 const router = useRouter()
+const isFullscreen = ref(false)
 
 function onBack() {
   if (window.history.length > 1) {
@@ -39,4 +45,26 @@ function onBack() {
     router.push('/')
   }
 }
+
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+async function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    await document.documentElement.requestFullscreen().catch(() => {
+      showToast('全屏失败，请检查浏览器是否支持')
+    })
+  } else {
+    await document.exitFullscreen()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+})
 </script>

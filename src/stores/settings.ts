@@ -16,6 +16,8 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   hdrWarmFilter: 0,
   oledExtremeBlack: false,
   oledTextBrightness: 80,
+  oledCursorBrightnessEnabled: false,
+  oledCursorBrightness: 80,
   autoRefreshFeed: true,
 }
 

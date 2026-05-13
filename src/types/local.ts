@@ -94,6 +94,10 @@ export interface ReaderSettings {
   oledExtremeBlack?: boolean
   /** OLED 极端黑色模式：文字/UI 亮度 0-100，100=纯白，0=纯黑 */
   oledTextBrightness?: number
+  /** OLED 极端黑色模式：是否单独设置鼠标光标亮度 */
+  oledCursorBrightnessEnabled?: boolean
+  /** OLED 极端黑色模式：鼠标光标亮度 0-100，100=纯白，0=纯黑 */
+  oledCursorBrightness?: number
   /** 是否在「重新激活信息流」时自动刷新（5 分钟 TTL） */
   autoRefreshFeed?: boolean
 }

@@ -94,7 +94,12 @@ watch(
 const hdrCursorColor = computed(() => {
   const s = settingsStore.settings
   if (!s.hdrEyeCare) return null
-  if (s.oledExtremeBlack) return `hsl(0,0%,${s.oledTextBrightness ?? 80}%)`
+  if (s.oledExtremeBlack) {
+    const b = s.oledCursorBrightnessEnabled
+      ? (s.oledCursorBrightness ?? s.oledTextBrightness ?? 80)
+      : (s.oledTextBrightness ?? 80)
+    return `hsl(0,0%,${b}%)`
+  }
   // 非极端黑模式：匹配 HDR 深色主题文字色 (#d0d0d8 ≈ 82%)
   return 'hsl(0,0%,82%)'
 })
