@@ -11,9 +11,13 @@
     :style="{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }"
   >
     <template #right>
-      <span class="fullscreen-btn hidden md:inline-block mr-2" @click.stop="toggleFullscreen">
-        <van-icon :name="isFullscreen ? 'shrink' : 'expand-o'" size="18" class="text-text align-middle" />
-      </span>
+      <button
+        class="fullscreen-btn hidden md:inline-flex items-center justify-center w-8 h-8 mr-1 rounded-full opacity-60 hover:opacity-100 hover:bg-black/8 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer border-none bg-transparent"
+        @click.stop="toggleFullscreen"
+        :title="isFullscreen ? '退出全屏' : '全屏'"
+      >
+        <van-icon :name="isFullscreen ? 'shrink' : 'expand-o'" size="18" class="text-text" />
+      </button>
       <slot name="right" />
     </template>
   </van-nav-bar>

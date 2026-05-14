@@ -2,7 +2,13 @@
   <div class="home-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
     <NavBar title="PX-Reader">
       <template #right>
-        <van-icon name="search" size="20" class="text-text" />
+        <button
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full opacity-60 hover:opacity-100 hover:bg-black/8 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer border-none bg-transparent"
+          title="搜索"
+          @click="router.push('/search')"
+        >
+          <van-icon name="search" size="20" class="text-text" />
+        </button>
       </template>
     </NavBar>
 
