@@ -1,6 +1,6 @@
 <template>
   <div class="reader-view min-h-screen bg-bg">
-    <!-- 顶部导航 -->
+    <!-- 顶部控制区 -->
     <transition name="fade">
       <div v-show="showControls" class="fixed top-0 left-0 right-0 z-50">
         <van-nav-bar
@@ -23,6 +23,62 @@
             </div>
           </template>
         </van-nav-bar>
+
+        <!-- 作品信息 -->
+        <div v-if="novelMeta" class="bg-surface/95 backdrop-blur-sm px-4 pt-3 pb-4 border-b border-border">
+          <div class="flex items-start justify-between gap-3">
+            <h1 class="text-text text-base font-bold leading-snug flex-1">{{ novelMeta.title }}</h1>
+            <van-button
+              size="small"
+              :type="novelMeta.is_bookmarked ? 'warning' : 'primary'"
+              :loading="bookmarkLoading"
+              round
+              @click.stop
+              @pointerdown.stop="onBookmarkPress"
+              @pointerup.stop="onBookmarkRelease"
+              @pointerleave.stop="onBookmarkRelease"
+              @pointercancel.stop="onBookmarkRelease"
+            >
+              {{ novelMeta.is_bookmarked ? '已收藏' : '收藏' }}
+            </van-button>
+          </div>
+          <div
+            class="flex items-center gap-2 mt-2 cursor-pointer w-fit"
+            @click.stop="goToAuthor"
+          >
+            <img
+              v-if="authorAvatar"
+              :src="authorAvatar"
+              class="w-6 h-6 rounded-full object-cover"
+            />
+            <span class="text-text text-sm hover:text-primary transition-colors">
+              {{ novelMeta.user?.name }}
+            </span>
+            <van-icon name="arrow" size="12" class="text-text-secondary" />
+          </div>
+          <NovelStats
+            :text-length="novelMeta.text_length"
+            :bookmarks="novelMeta.total_bookmarks"
+            :views="novelMeta.total_view"
+            :comments="novelMeta.total_comments"
+            size="sm"
+            class="mt-2"
+          />
+          <p
+            v-if="novelMeta.caption"
+            class="text-text-secondary text-xs mt-2 leading-relaxed line-clamp-2"
+            v-html="novelMeta.caption"
+          />
+          <NovelTags
+            v-if="novelMeta.tags?.length"
+            :tags="novelMeta.tags"
+            :max="6"
+            expandable
+            show-translated
+            size="sm"
+            class="mt-2"
+          />
+        </div>
       </div>
     </transition>
 
@@ -43,47 +99,6 @@
       @contextmenu.prevent="onContextMenu"
       @scroll="updateProgress"
     >
-      <!-- 作品信息头 -->
-      <div v-if="novelMeta" class="bg-surface px-4 pt-6 pb-4 border-b border-border">
-        <h1 class="text-text text-lg font-bold leading-snug">{{ novelMeta.title }}</h1>
-        <div
-          class="flex items-center gap-2 mt-3 cursor-pointer w-fit"
-          @click.stop="goToAuthor"
-        >
-          <img
-            v-if="authorAvatar"
-            :src="authorAvatar"
-            class="w-7 h-7 rounded-full object-cover"
-          />
-          <span class="text-text text-sm hover:text-primary transition-colors">
-            {{ novelMeta.user?.name }}
-          </span>
-          <van-icon name="arrow" size="12" class="text-text-secondary" />
-        </div>
-        <NovelStats
-          :text-length="novelMeta.text_length"
-          :bookmarks="novelMeta.total_bookmarks"
-          :views="novelMeta.total_view"
-          :comments="novelMeta.total_comments"
-          size="md"
-          class="mt-3"
-        />
-        <p
-          v-if="novelMeta.caption"
-          class="text-text-secondary text-xs mt-3 leading-relaxed"
-          v-html="novelMeta.caption"
-        />
-        <NovelTags
-          v-if="novelMeta.tags?.length"
-          :tags="novelMeta.tags"
-          :max="6"
-          expandable
-          show-translated
-          size="sm"
-          class="mt-3"
-        />
-      </div>
-
       <!-- 章节导航：仅在有多章且检测到自然章节标题时显示（字数兜底划分不展示） -->
       <div
         v-if="chapters.length > 1 && hasNaturalChapters && settingsStore.settings.showChapterNav"
@@ -305,6 +320,72 @@
       </div>
     </van-popup>
 
+    <!-- 标签收藏 Dialog -->
+    <van-popup
+      v-model:show="showTagDialog"
+      teleport="body"
+      round
+      closeable
+      class="center-modal"
+      :style="{ width: '88vw', maxWidth: '480px' }"
+    >
+      <div class="center-modal__header">添加收藏标签</div>
+      <div class="p-4 pt-2 space-y-4 center-modal__content">
+        <!-- 已有标签选择 -->
+        <div v-if="existingTags.length > 0">
+          <span class="text-xs text-text-secondary mb-2 block">已有标签</span>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="t in existingTags"
+              :key="t.name"
+              class="px-3 py-1 rounded-full text-xs cursor-pointer transition-colors"
+              :class="isTagSelected(t.name) ? 'bg-primary text-white' : 'bg-bg text-text-secondary border border-border'"
+              @click="toggleTag(t.name)"
+            >{{ t.name }}</span>
+          </div>
+        </div>
+
+        <!-- 已选标签 -->
+        <div v-if="selectedTags.length > 0">
+          <span class="text-xs text-text-secondary mb-2 block">已选标签</span>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="t in selectedTags"
+              :key="t"
+              class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary border border-primary/30 flex items-center gap-1"
+            >
+              {{ t }}
+              <van-icon name="cross" size="10" class="cursor-pointer" @click="removeTag(t)" />
+            </span>
+          </div>
+        </div>
+
+        <!-- 新增标签输入 -->
+        <div>
+          <span class="text-xs text-text-secondary mb-2 block">新增标签</span>
+          <div class="flex gap-2">
+            <input
+              v-model="newTagInput"
+              class="flex-1 px-3 py-2 rounded-lg text-sm bg-bg text-text border border-border outline-none focus:border-primary transition-colors"
+              placeholder="输入标签名，回车添加"
+              @keyup.enter="addNewTag"
+            />
+            <van-button size="small" @click="addNewTag">添加</van-button>
+          </div>
+        </div>
+
+        <van-button
+          type="primary"
+          block
+          round
+          :loading="bookmarkLoading"
+          @click="confirmTagBookmark"
+        >
+          {{ novelMeta?.is_bookmarked ? '更新收藏' : '确认收藏' }}
+        </van-button>
+      </div>
+    </van-popup>
+
     <!-- 菜单 -->
     <van-popup
       v-model:show="showMenu"
@@ -447,17 +528,17 @@
 import { ref, onMounted, watch, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { useNovelStore, useSettingsStore, useShelfStore } from '@/stores'
+import { useNovelStore, useSettingsStore, useShelfStore, useAuthStore } from '@/stores'
 import { splitChaptersInWorker } from '@/workers'
 import { getTxtCache } from '@/db'
-import { getProxiedImageUrl } from '@/api'
+import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail } from '@/api'
 import {
   parseNovelMarkup,
   resolvePixivImageUrl,
   resolveUploadedImageUrl,
   type NovelToken,
 } from '@/utils/novelMarkup'
-import type { TxtChapter, LocalNovelMeta, NovelMeta } from '@/types'
+import { ApiError, type TxtChapter, type LocalNovelMeta, type NovelMeta } from '@/types'
 import NovelTags from '@/components/NovelTags.vue'
 import NovelStats from '@/components/NovelStats.vue'
 
@@ -466,6 +547,7 @@ const router = useRouter()
 const novelStore = useNovelStore()
 const settingsStore = useSettingsStore()
 const shelfStore = useShelfStore()
+const authStore = useAuthStore()
 
 const loading = ref(true)
 const content = ref('')
@@ -479,6 +561,11 @@ const showMenu = ref(false)
 const scrollPercent = ref(0)
 const activeChapter = ref(0)
 const isInShelf = ref(false)
+const bookmarkLoading = ref(false)
+const showTagDialog = ref(false)
+const existingTags = ref<{ name: string }[]>([])
+const selectedTags = ref<string[]>([])
+const newTagInput = ref('')
 const contentRef = ref<HTMLElement | null>(null)
 const chapterRefs = ref<Map<number, HTMLElement>>(new Map())
 
@@ -698,6 +785,121 @@ async function toggleShelf() {
     await shelfStore.addToShelf(meta)
     isInShelf.value = true
     showToast('已加入书架')
+  }
+}
+
+// ── 收藏：单击快捷收藏 / 长按弹标签 ────────────────
+
+let pressTimer: ReturnType<typeof setTimeout> | null = null
+let isLongPress = false
+
+function onBookmarkPress() {
+  isLongPress = false
+  pressTimer = setTimeout(() => {
+    isLongPress = true
+    openTagDialog()
+  }, 500)
+}
+
+function onBookmarkRelease() {
+  if (pressTimer) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+  if (!isLongPress) {
+    quickBookmark()
+  }
+}
+
+async function quickBookmark() {
+  if (!novelMeta.value || bookmarkLoading.value) return
+  bookmarkLoading.value = true
+  const m = novelMeta.value
+  try {
+    if (m.is_bookmarked) {
+      await unbookmarkNovel(m.id)
+      m.is_bookmarked = false
+      m.total_bookmarks = Math.max(0, m.total_bookmarks - 1)
+      showToast('已取消收藏')
+    } else {
+      await bookmarkNovel(m.id)
+      m.is_bookmarked = true
+      m.total_bookmarks += 1
+      showToast('已添加收藏')
+    }
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      authStore.handle401()
+      showToast('登录已过期，请重新登录')
+    } else {
+      showToast(e instanceof Error ? e.message : '操作失败')
+    }
+  } finally {
+    bookmarkLoading.value = false
+  }
+}
+
+async function openTagDialog() {
+  if (!novelMeta.value) return
+  showTagDialog.value = true
+  selectedTags.value = []
+  newTagInput.value = ''
+
+  // 加载已有标签
+  try {
+    const detail = await getBookmarkDetail(novelMeta.value.id)
+    existingTags.value = detail.bookmark_detail?.tags || []
+  } catch {
+    existingTags.value = []
+  }
+}
+
+function isTagSelected(name: string): boolean {
+  return selectedTags.value.includes(name)
+}
+
+function toggleTag(name: string) {
+  const idx = selectedTags.value.indexOf(name)
+  if (idx >= 0) {
+    selectedTags.value.splice(idx, 1)
+  } else {
+    selectedTags.value.push(name)
+  }
+}
+
+function removeTag(name: string) {
+  const idx = selectedTags.value.indexOf(name)
+  if (idx >= 0) selectedTags.value.splice(idx, 1)
+}
+
+function addNewTag() {
+  const name = newTagInput.value.trim()
+  if (!name) return
+  if (!selectedTags.value.includes(name)) {
+    selectedTags.value.push(name)
+  }
+  newTagInput.value = ''
+}
+
+async function confirmTagBookmark() {
+  if (!novelMeta.value || bookmarkLoading.value) return
+  bookmarkLoading.value = true
+  const m = novelMeta.value
+  try {
+    await bookmarkNovel(m.id, 'public', selectedTags.value.length > 0 ? selectedTags.value : undefined)
+    m.is_bookmarked = true
+    m.total_bookmarks += 1
+    showToast(selectedTags.value.length > 0 ? `已收藏（${selectedTags.value.length} 个标签）` : '已添加收藏')
+    showTagDialog.value = false
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      authStore.handle401()
+      showToast('登录已过期，请重新登录')
+    } else {
+      showToast(e instanceof Error ? e.message : '操作失败')
+    }
+  } finally {
+    bookmarkLoading.value = false
   }
 }
 

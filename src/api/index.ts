@@ -17,6 +17,8 @@ import type {
   FollowNovelsResponse,
   UserNovelsResponse,
   NovelTextResponse,
+  BookmarkDetailResponse,
+  BookmarkTagsResponse,
 } from '@/types'
 import {
   generateCodeVerifier,
@@ -31,6 +33,8 @@ import {
   getAccessToken,
   getRefreshToken,
   isAccessTokenExpired,
+  saveUserId,
+  getUserId,
 } from '@/utils/token'
 
 const BASE_URL = import.meta.env.DEV
@@ -78,6 +82,11 @@ function persistTokens(resp: PixivTokenResponse) {
     refreshToken: resp.refresh_token,
     expiresAt: Date.now() + (resp.expires_in || 3600) * 1000,
   })
+  // 从 token 响应中提取并保存 Pixiv 用户 ID
+  const user = resp.user as { id?: string | number } | undefined
+  if (user?.id) {
+    saveUserId(user.id)
+  }
 }
 
 // ── 认证（前端实现 PKCE 全流程） ──────────────────────
@@ -155,6 +164,8 @@ export function hasTokens(): boolean {
 interface ApiRequestOptions {
   method?: 'GET' | 'POST'
   query?: Record<string, string | undefined>
+  /** POST 表单数据（application/x-www-form-urlencoded） */
+  form?: URLSearchParams
   /** 期望响应格式：默认 json */
   responseType?: 'json' | 'text'
   /** 内部用：避免无限重试 */
@@ -183,9 +194,16 @@ async function apiRequest<T>(path: string, opts: ApiRequestOptions = {}): Promis
   const q = qs.toString()
   const url = `${BASE_URL}/app${path}${q ? `?${q}` : ''}`
 
+  const headers: Record<string, string> = { Authorization: `Bearer ${access}` }
+  let body: string | undefined
+  if (opts.form) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    body = opts.form.toString()
+  }
   const res = await fetch(url, {
     method: opts.method || 'GET',
-    headers: { Authorization: `Bearer ${access}` },
+    headers,
+    body,
   })
 
   if (res.status === 401 && !opts._retry && getRefreshToken()) {
@@ -254,6 +272,100 @@ export function getUserNovels(params: {
     query: {
       user_id: String(params.user_id),
       offset: params.offset,
+    },
+  })
+}
+
+/** 关注用户 */
+export function followUser(userId: number | string, restrict = 'public'): Promise<void> {
+  const form = new URLSearchParams()
+  form.set('user_id', String(userId))
+  form.set('restrict', restrict)
+  return apiRequest<void>('/v1/user/follow/add', {
+    method: 'POST',
+    form,
+  })
+}
+
+/** 取消关注用户 */
+export function unfollowUser(userId: number | string): Promise<void> {
+  const form = new URLSearchParams()
+  form.set('user_id', String(userId))
+  return apiRequest<void>('/v1/user/follow/delete', {
+    method: 'POST',
+    form,
+  })
+}
+
+/** 添加收藏（书签），可选标签 */
+export function bookmarkNovel(novelId: number | string, restrict = 'public', tags?: string[]): Promise<void> {
+  const form = new URLSearchParams()
+  form.set('novel_id', String(novelId))
+  form.set('restrict', restrict)
+  if (tags?.length) {
+    tags.forEach((t) => form.append('tags[]', t))
+  }
+  return apiRequest<void>('/v2/novel/bookmark/add', {
+    method: 'POST',
+    form,
+  })
+}
+
+/** 取消收藏（书签） */
+export function unbookmarkNovel(novelId: number | string): Promise<void> {
+  const form = new URLSearchParams()
+  form.set('novel_id', String(novelId))
+  return apiRequest<void>('/v1/novel/bookmark/delete', {
+    method: 'POST',
+    form,
+  })
+}
+
+/** 获取单篇小说收藏详情（标签、状态） */
+export function getBookmarkDetail(novelId: number | string): Promise<BookmarkDetailResponse> {
+  return apiRequest<BookmarkDetailResponse>('/v2/novel/bookmark/detail', {
+    query: { novel_id: String(novelId) },
+  })
+}
+
+/** 获取用户所有收藏标签列表 */
+export function getBookmarkTags(userId: number | string, restrict = 'public'): Promise<BookmarkTagsResponse> {
+  return apiRequest<BookmarkTagsResponse>('/v1/user/bookmark-tags/novel', {
+    query: {
+      user_id: String(userId),
+      restrict,
+    },
+  })
+}
+
+/** 获取用户收藏小说列表 */
+export function getBookmarkedNovels(params?: {
+  restrict?: string
+  tag?: string
+  next_url?: string
+}): Promise<FollowNovelsResponse> {
+  // 如果有 next_url，从中提取 query 参数直接使用
+  if (params?.next_url) {
+    try {
+      const u = new URL(params.next_url)
+      const q: Record<string, string | undefined> = {}
+      u.searchParams.forEach((v, k) => { q[k] = v })
+      // 确保 restrict 存在（next_url 中可能没有）
+      if (!q.restrict) q.restrict = 'public'
+      return apiRequest<FollowNovelsResponse>('/v1/user/bookmarks/novel', { query: q })
+    } catch {
+      // next_url 解析失败，回退到常规请求
+    }
+  }
+
+  const userId = getUserId()
+  if (!userId) throw new ApiError('未获取到用户 ID，请重新登录', 401)
+
+  return apiRequest<FollowNovelsResponse>('/v1/user/bookmarks/novel', {
+    query: {
+      user_id: userId,
+      restrict: params?.restrict || 'public',
+      tag: params?.tag,
     },
   })
 }

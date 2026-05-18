@@ -9,6 +9,7 @@
 const ACCESS_KEY = 'pixiv_access_token'
 const REFRESH_KEY = 'pixiv_refresh_token'
 const EXPIRES_AT_KEY = 'pixiv_access_expires_at' // 毫秒时间戳
+const USER_ID_KEY = 'pixiv_user_id'
 
 export interface PixivTokens {
   accessToken: string
@@ -35,6 +36,7 @@ export function clearTokens(): void {
   localStorage.removeItem(ACCESS_KEY)
   localStorage.removeItem(REFRESH_KEY)
   localStorage.removeItem(EXPIRES_AT_KEY)
+  localStorage.removeItem(USER_ID_KEY)
 }
 
 export function getAccessToken(): string | null {
@@ -43,6 +45,16 @@ export function getAccessToken(): string | null {
 
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_KEY)
+}
+
+/** 保存当前 Pixiv 用户 ID */
+export function saveUserId(id: number | string): void {
+  localStorage.setItem(USER_ID_KEY, String(id))
+}
+
+/** 获取当前 Pixiv 用户 ID */
+export function getUserId(): string | null {
+  return localStorage.getItem(USER_ID_KEY)
 }
 
 /** access_token 是否已过期（提前 60s 视为过期） */

@@ -19,7 +19,9 @@
         v-if="userInfo.is_followed !== undefined"
         size="small"
         :type="userInfo.is_followed ? 'default' : 'primary'"
+        :loading="followLoading"
         round
+        @click="toggleFollow"
       >
         {{ userInfo.is_followed ? '已关注' : '关注' }}
       </van-button>
@@ -73,10 +75,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
-import { useNovelStore, useBlockStore } from '@/stores'
+import { useNovelStore, useBlockStore, useAuthStore } from '@/stores'
 import { useScrollRestore } from '@/composables'
-import { getProxiedImageUrl } from '@/api'
-import type { NovelMeta, PixivUser } from '@/types'
+import { getProxiedImageUrl, followUser, unfollowUser } from '@/api'
+import { ApiError, type NovelMeta, type PixivUser } from '@/types'
 import NavBar from '@/components/NavBar.vue'
 import NovelCard from '@/components/NovelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -86,6 +88,7 @@ const props = defineProps<{ id: string }>()
 const router = useRouter()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
+const authStore = useAuthStore()
 const scrollRef = ref<HTMLElement | null>(null)
 
 useScrollRestore({
@@ -95,6 +98,7 @@ useScrollRestore({
 
 const loading = ref(true)
 const loadingMore = ref(false)
+const followLoading = ref(false)
 const userInfo = ref<PixivUser | null>(null)
 const novels = ref<NovelMeta[]>([])
 const nextUrl = ref<string | null>(null)
@@ -109,6 +113,30 @@ const isAuthorBlocked = computed(() =>
 const visibleNovels = computed<NovelMeta[]>(() =>
   novels.value.filter((n) => !blockStore.evaluate(n)),
 )
+
+async function toggleFollow() {
+  if (!userInfo.value || followLoading.value) return
+  followLoading.value = true
+  const u = userInfo.value
+  try {
+    if (u.is_followed) {
+      await unfollowUser(u.id)
+      u.is_followed = false
+    } else {
+      await followUser(u.id)
+      u.is_followed = true
+    }
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      authStore.handle401()
+      showToast('登录已过期，请重新登录')
+    } else {
+      showToast(e instanceof Error ? e.message : '操作失败')
+    }
+  } finally {
+    followLoading.value = false
+  }
+}
 
 async function toggleBlock() {
   if (!userInfo.value) return

@@ -138,6 +138,28 @@ export interface ErrorResponse {
   error: string
 }
 
+/** 收藏标签 */
+export interface BookmarkTag {
+  name: string
+  count?: number
+  is_registered?: boolean
+}
+
+/** 收藏详情响应 */
+export interface BookmarkDetailResponse {
+  bookmark_detail: {
+    is_bookmarked: boolean
+    tags: BookmarkTag[]
+    restrict: string
+  }
+}
+
+/** 收藏标签列表响应 */
+export interface BookmarkTagsResponse {
+  bookmark_tags: BookmarkTag[]
+  next_url: string | null
+}
+
 /** API 错误 */
 export class ApiError extends Error {
   constructor(

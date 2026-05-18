@@ -10,6 +10,12 @@
     :border="false"
     :style="{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }"
   >
+    <template #left>
+      <slot name="left" />
+    </template>
+    <template #title>
+      <slot name="title">{{ title }}</slot>
+    </template>
     <template #right>
       <button
         class="fullscreen-btn hidden md:inline-flex items-center justify-center w-8 h-8 mr-1 rounded-full opacity-60 hover:opacity-100 hover:bg-black/8 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer border-none bg-transparent"

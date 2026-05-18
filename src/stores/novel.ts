@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { ApiError, type NovelMeta, type NovelTextResponse } from '@/types'
+import { ApiError, type NovelMeta, type NovelTextResponse, type BookmarkTag } from '@/types'
 import {
   getRecommendedNovels,
   getFollowNovels,
   getUserNovels,
   getNovelText,
   searchNovels,
+  getBookmarkedNovels,
+  getBookmarkTags,
 } from '@/api'
 import { useAuthStore } from './auth'
 
@@ -160,6 +162,82 @@ export const useNovelStore = defineStore('novel', () => {
     }
   }
 
+  // ── 收藏列表 ────────────────────────────────────
+
+  const bookmarks = ref<NovelMeta[]>([])
+  const bookmarksNextUrl = ref<string | null>(null)
+  const bookmarksLoading = ref(false)
+
+  async function loadBookmarks(reset = false) {
+    if (bookmarksLoading.value) return
+    bookmarksLoading.value = true
+    error.value = null
+    try {
+      if (reset) {
+        bookmarks.value = []
+        bookmarksNextUrl.value = null
+      }
+      const res = await getBookmarkedNovels({
+        restrict: 'public',
+        ...(bookmarksNextUrl.value && !reset ? { next_url: bookmarksNextUrl.value } : {}),
+      })
+      bookmarks.value = reset ? res.novels : [...bookmarks.value, ...res.novels]
+      bookmarksNextUrl.value = res.next_url
+      cacheMetas(res.novels)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        useAuthStore().handle401()
+      }
+      error.value = e instanceof Error ? e.message : '加载收藏失败'
+    } finally {
+      bookmarksLoading.value = false
+    }
+  }
+
+  // ── 收藏标签 ────────────────────────────────────
+
+  const bookmarkTags = ref<BookmarkTag[]>([])
+  const bookmarkTagsLoading = ref(false)
+  const selectedBookmarkTag = ref<string | null>(null)
+
+  async function loadBookmarkTags() {
+    if (bookmarkTagsLoading.value) return
+    bookmarkTagsLoading.value = true
+    try {
+      const { getUserId } = await import('@/utils/token')
+      const userId = getUserId()
+      if (!userId) throw new ApiError('not logged in', 401)
+      const res = await getBookmarkTags(userId)
+      bookmarkTags.value = res.bookmark_tags || []
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        useAuthStore().handle401()
+      }
+      // 静默失败
+    } finally {
+      bookmarkTagsLoading.value = false
+    }
+  }
+
+  async function filterBookmarksByTag(tag: string | null) {
+    selectedBookmarkTag.value = tag
+    bookmarks.value = []
+    bookmarksNextUrl.value = null
+    try {
+      const res = await getBookmarkedNovels({
+        restrict: 'public',
+        ...(tag ? { tag } : {}),
+      })
+      bookmarks.value = res.novels
+      bookmarksNextUrl.value = res.next_url
+      cacheMetas(res.novels)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        useAuthStore().handle401()
+      }
+    }
+  }
+
   // ── 小说正文 ──────────────────────────────────────
 
   async function loadNovelText(id: string | number): Promise<string | null> {
@@ -205,7 +283,16 @@ export const useNovelStore = defineStore('novel', () => {
     loadRecommended,
     loadFollow,
     loadUserNovels,
+    bookmarks,
+    bookmarksNextUrl,
+    bookmarksLoading,
+    bookmarkTags,
+    bookmarkTagsLoading,
+    selectedBookmarkTag,
     loadSearch,
+    loadBookmarks,
+    loadBookmarkTags,
+    filterBookmarksByTag,
     loadNovelText,
   }
 }, {
