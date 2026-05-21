@@ -10,6 +10,7 @@ import {
   getBookmarkedNovels,
   getBookmarkTags,
 } from '@/api'
+import { isRestrictedBrowser, getRestrictedBrowserName } from '@/utils/browser'
 import { useAuthStore } from './auth'
 
 export const useNovelStore = defineStore('novel', () => {
@@ -244,7 +245,25 @@ export const useNovelStore = defineStore('novel', () => {
     currentTextLoading.value = true
     error.value = null
     try {
-      const res = await getNovelText(id)
+      let res: NovelTextResponse
+      try {
+        res = await getNovelText(id)
+      } catch (e) {
+        // 未登录时尝试免登录模式（由 Worker 注入服务端备用 token）
+        // 但 QQ / 微信内置浏览器跨域受限，跳过免登录直接提示用户登录
+        if (e instanceof ApiError && (e.status === 401 || e.message?.includes('not logged in'))) {
+          if (isRestrictedBrowser()) {
+            const name = getRestrictedBrowserName() || '当前浏览器'
+            throw new ApiError(
+              `${name} 不支持免登录查看，请点击右上角菜单在浏览器中打开后登录`,
+              401,
+            )
+          }
+          res = await getNovelText(id, true)
+        } else {
+          throw e
+        }
+      }
       currentText.value = res.novel_text
       currentIllusts.value = res.illusts
       currentImages.value = res.images

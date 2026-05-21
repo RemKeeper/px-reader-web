@@ -388,14 +388,51 @@ export function searchNovels(params: {
 }
 
 /**
+ * 无需本地 token 的 GET 请求：不带 Authorization 头，
+ * 由 Worker 注入服务端备用 token（仅适用于 /webview/v2/novel）。
+ */
+async function guestApiRequest<T>(path: string, opts: ApiRequestOptions = {}): Promise<T> {
+  const qs = new URLSearchParams()
+  if (opts.query) {
+    for (const [k, v] of Object.entries(opts.query)) {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, v)
+    }
+  }
+  const q = qs.toString()
+  const url = `${BASE_URL}/app${path}${q ? `?${q}` : ''}`
+
+  const res = await fetch(url, { method: 'GET' })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    let msg = `HTTP ${res.status}`
+    if (text) {
+      try {
+        const j = JSON.parse(text)
+        msg = j.error?.user_message || j.error?.message || j.message || j.error || text.slice(0, 300)
+      } catch {
+        msg = text.slice(0, 300)
+      }
+    }
+    throw new ApiError(msg, res.status)
+  }
+
+  if (opts.responseType === 'text') return (await res.text()) as unknown as T
+  return (await res.json()) as T
+}
+
+/**
  * 获取小说正文。
  *
  * Pixiv 已下线 `/v1/novel/text` 接口（参考 pixivpy #337），
  * 现统一使用 `/webview/v2/novel?id=X&viewer_version=20221031_ai`，
  * 该接口返回 HTML，正文 JSON 内嵌在 `novel: { ... }, isOwnWork` 片段中。
+ *
+ * @param guest - 为 true 时不带本地 token，由 Worker 注入服务端备用 token（免登录分享模式）
  */
-export async function getNovelText(id: string | number): Promise<NovelTextResponse> {
-  const html = await apiRequest<string>('/webview/v2/novel', {
+export async function getNovelText(id: string | number, guest = false): Promise<NovelTextResponse> {
+  const reqFn = guest ? guestApiRequest : apiRequest
+  const html = await reqFn<string>('/webview/v2/novel', {
     query: { id: String(id), viewer_version: '20221031_ai' },
     responseType: 'text',
   })

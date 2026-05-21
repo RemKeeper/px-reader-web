@@ -11,7 +11,22 @@
  *   GET   /image?url=<encoded>     → 透传 i.pximg.net 图片（注入 Referer）
  *   *     /                        → 健康检查
  *
- * 部署：
+ * 服务端备用 Token（免登录分享）：
+ *   当请求 /app/webview/v2/novel 且不携带 Authorization 时，
+ *   Worker 会依次尝试：
+ *     1. 环境变量 PIXIV_ACCESS_TOKEN（直接使用）
+ *     2. PIXIV_KV 中的缓存 access_token（含过期检查）
+ *     3. 环境变量 PIXIV_REFRESH_TOKEN → 刷新并写入 KV
+ *   均失败则照常透传（上游会返回 401）。
+ *
+ * 部署（需在 wrangler.toml 中配置绑定）：
+ *   [vars]
+ *   PIXIV_REFRESH_TOKEN = "your_refresh_token"
+ *
+ *   [[kv_namespaces]]
+ *   binding = "PIXIV_KV"
+ *   id = "your_kv_namespace_id"
+ *
  *   1) npm i -g wrangler
  *   2) wrangler deploy worker.js --name px-reader-proxy
  *   或者在 dashboard 直接粘贴此文件到 Workers 编辑器。
@@ -19,6 +34,8 @@
 
 const PIXIV_UA = 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)'
 const HASH_SECRET = '28c1fdd170a5204386cb1313c7077b34f83e4aaf4aa829ce78c231e05b0bae2c'
+const PIXIV_CLIENT_ID = 'MOBrBDS8blbauoSck0ZfDbtuzpyT'
+const PIXIV_CLIENT_SECRET = 'lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj'
 
 // CORS 白名单：默认反射 Origin。如要锁死域名，把 ALLOWED_ORIGINS 设成具体列表。
 const ALLOWED_ORIGINS = null // 例：new Set(['https://reader.rem.asia'])
@@ -184,6 +201,67 @@ async function pixivHeaders(extra = {}) {
   }
 }
 
+// ── 服务端备用 Token ──────────────────────────────────────
+// 用于免登录访问 /app/webview/v2/novel（分享链接）。
+// 需要在 wrangler.toml 中绑定：
+//   [vars]  PIXIV_REFRESH_TOKEN = "..."
+//   [[kv_namespaces]]  binding = "PIXIV_KV"  id = "..."
+
+/**
+ * 获取服务端备用 access_token（CF Workers 版）。
+ * @param {object} env - Workers env bindings
+ */
+async function getServerAccessToken(env) {
+  if (!env) return null
+
+  // 1. 环境变量直接配置了 access_token
+  if (env.PIXIV_ACCESS_TOKEN) return env.PIXIV_ACCESS_TOKEN
+
+  // 2. KV 中的缓存
+  const kv = env.PIXIV_KV
+  if (kv) {
+    const cached = await kv.get('pixiv_access_token', 'json')
+    if (cached && cached.expiresAt > Date.now() + 60_000) {
+      return cached.token
+    }
+  }
+
+  // 3. 用 refresh_token 刷新
+  if (!env.PIXIV_REFRESH_TOKEN) return null
+
+  try {
+    const form = new URLSearchParams({
+      client_id: PIXIV_CLIENT_ID,
+      client_secret: PIXIV_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      include_policy: 'true',
+      refresh_token: env.PIXIV_REFRESH_TOKEN,
+    })
+    const resp = await fetch('https://oauth.secure.pixiv.net/auth/token', {
+      method: 'POST',
+      headers: await pixivHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+      body: form.toString(),
+    })
+    if (!resp.ok) return null
+    const data = await resp.json()
+    if (!data.access_token) return null
+
+    // 写入 KV（带 TTL）
+    const expiresIn = data.expires_in || 3600
+    const expiresAt = Date.now() + expiresIn * 1000
+    if (kv) {
+      await kv.put(
+        'pixiv_access_token',
+        JSON.stringify({ token: data.access_token, expiresAt }),
+        { expirationTtl: expiresIn },
+      )
+    }
+    return data.access_token
+  } catch {
+    return null
+  }
+}
+
 // ── 路由 ─────────────────────────────────────────────
 
 async function handleOAuthToken(req) {
@@ -204,10 +282,10 @@ async function handleOAuthToken(req) {
   })
 }
 
-async function handleAppApi(req, url) {
+async function handleAppApi(req, url, fallbackToken) {
   const target = 'https://app-api.pixiv.net' + url.pathname.replace(/^\/app/, '') + url.search
   const headers = await pixivHeaders()
-  const auth = req.headers.get('Authorization')
+  const auth = req.headers.get('Authorization') || (fallbackToken ? `Bearer ${fallbackToken}` : null)
   if (auth) headers['Authorization'] = auth
   const ct = req.headers.get('Content-Type')
   if (ct) headers['Content-Type'] = ct
@@ -254,7 +332,7 @@ async function handleImage(url) {
 }
 
 export default {
-  async fetch(req) {
+  async fetch(req, env) {
     if (req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(req) })
     }
@@ -265,7 +343,13 @@ export default {
       if (url.pathname === '/oauth/auth/token') {
         resp = await handleOAuthToken(req)
       } else if (url.pathname.startsWith('/app/')) {
-        resp = await handleAppApi(req, url)
+        // 免登录分享：/app/webview/v2/novel 无 Authorization 时注入服务端备用 token
+        if (url.pathname === '/app/webview/v2/novel' && !req.headers.get('Authorization')) {
+          const serverToken = await getServerAccessToken(env)
+          resp = await handleAppApi(req, url, serverToken)
+        } else {
+          resp = await handleAppApi(req, url)
+        }
       } else if (url.pathname === '/image') {
         resp = await handleImage(url)
       } else if (url.pathname === '/' || url.pathname === '') {

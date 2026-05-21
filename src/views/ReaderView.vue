@@ -95,6 +95,21 @@
       </van-loading>
     </div>
 
+    <!-- 加载失败（未登录且服务端无备用 token，或受限浏览器） -->
+    <div v-else-if="!loading && loadError && !content" class="h-screen flex-center flex-col gap-4 px-8">
+      <van-icon name="warning-o" size="48" class="text-text-secondary" />
+      <p class="text-text-secondary text-sm text-center leading-relaxed">{{ loadError }}</p>
+      <!-- QQ / 微信：提示在浏览器中打开；其他情况：跳转登录 -->
+      <template v-if="isRestrictedBrowserEnv">
+        <p class="text-xs text-text-secondary text-center">
+          请点击右上角菜单 → <strong>在浏览器中打开</strong>，然后登录即可查看
+        </p>
+      </template>
+      <template v-else>
+        <van-button type="primary" round @click="() => $router.push('/login')">登录后查看</van-button>
+      </template>
+    </div>
+
     <!-- 正文 -->
     <div
       v-else
@@ -545,6 +560,7 @@ import {
   resolveUploadedImageUrl,
   type NovelToken,
 } from '@/utils/novelMarkup'
+import { isRestrictedBrowser } from '@/utils/browser'
 import { ApiError, type TxtChapter, type LocalNovelMeta, type NovelMeta } from '@/types'
 import NovelTags from '@/components/NovelTags.vue'
 import NovelStats from '@/components/NovelStats.vue'
@@ -557,6 +573,9 @@ const shelfStore = useShelfStore()
 const authStore = useAuthStore()
 
 const loading = ref(true)
+const loadError = ref<string | null>(null)
+/** 是否处于 QQ / 微信内置浏览器（受限环境） */
+const isRestrictedBrowserEnv = computed(() => isRestrictedBrowser())
 const content = ref('')
 const chapters = ref<TxtChapter[]>([])
 /** 分章是否来自自然章节标题（vs 按字数兜底划分） */
@@ -942,8 +961,16 @@ function onMenuSelect(action: { value: string }) {
   if (action.value === 'shelf') toggleShelf()
   else if (action.value === 'bookmarks') showToast('书签功能开发中')
   else if (action.value === 'share') {
-    navigator.clipboard?.writeText(window.location.href)
-    showToast('链接已复制')
+    const shareUrl = window.location.href
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast('链接已复制（无需登录即可查看）')
+      }).catch(() => {
+        showToast('复制失败，请手动复制地址栏链接')
+      })
+    } else {
+      showToast('复制失败，请手动复制地址栏链接')
+    }
   }
 }
 
@@ -989,7 +1016,7 @@ onMounted(async () => {
     novelTitle.value = cached.fileName
     loading.value = false
   } else {
-    // 从 API 加载
+    // 从 API 加载（未登录时自动尝试免登录模式）
     const text = await novelStore.loadNovelText(novelId)
     if (text) {
       content.value = text
@@ -997,6 +1024,9 @@ onMounted(async () => {
       chapters.value = result.chapters
       hasNaturalChapters.value = result.hasNaturalSplits
       if (!novelMeta.value) novelTitle.value = `小说 #${novelId}`
+    } else {
+      // 免登录模式也失败（服务端未配置备用 token）
+      loadError.value = novelStore.error || '加载失败，服务器未配置免登录 token，请登录后查看'
     }
     loading.value = false
   }

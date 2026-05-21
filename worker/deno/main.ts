@@ -12,6 +12,14 @@
  *   GET   /image?url=<encoded>     → 透传 i.pximg.net 图片（注入 Referer）
  *   *     /                        → 健康检查
  *
+ * 服务端备用 Token（免登录分享）：
+ *   当请求 /app/webview/v2/novel 且不携带 Authorization 时，
+ *   Worker 会依次尝试：
+ *     1. 环境变量 PIXIV_ACCESS_TOKEN（直接使用）
+ *     2. Deno KV 中的缓存 access_token（含过期检查）
+ *     3. 环境变量 PIXIV_REFRESH_TOKEN → 刷新并写入 KV
+ *   均失败则照常透传（上游会返回 401）。
+ *
  * 部署：
  *   1) 安装 deployctl:  deno install -Arf jsr:@deno/deployctl
  *   2) deployctl deploy --project=px-reader-proxy --entrypoint=main.ts
@@ -20,10 +28,27 @@
 
 const PIXIV_UA = 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)'
 const HASH_SECRET = '28c1fdd170a5204386cb1313c7077b34f83e4aaf4aa829ce78c231e05b0bae2c'
+const PIXIV_CLIENT_ID = 'MOBrBDS8blbauoSck0ZfDbtuzpyT'
+const PIXIV_CLIENT_SECRET = 'lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj'
 
 // CORS 白名单：默认反射 Origin。如要锁死域名，把 ALLOWED_ORIGINS 设成具体列表。
 const ALLOWED_ORIGINS: Set<string> | null = null
 // 例：const ALLOWED_ORIGINS = new Set(['https://reader.rem.asia'])
+
+// Deno KV — 懒加载，首次使用时初始化
+// deno-lint-ignore no-explicit-any
+let _kv: any | null = null
+// deno-lint-ignore no-explicit-any
+async function getKv(): Promise<any | null> {
+  if (_kv) return _kv
+  try {
+    // deno-lint-ignore no-explicit-any
+    _kv = await (globalThis as any).Deno?.openKv?.()
+    return _kv
+  } catch {
+    return null
+  }
+}
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get('Origin') || '*'
@@ -186,6 +211,75 @@ function pixivHeaders(extra: Record<string, string> = {}): Record<string, string
   }
 }
 
+// ── 服务端备用 Token ──────────────────────────────────────
+// 用于免登录访问 /app/webview/v2/novel（分享链接）。
+// 优先级：env PIXIV_ACCESS_TOKEN > KV 缓存 > 用 PIXIV_REFRESH_TOKEN 刷新
+
+interface CachedToken {
+  token: string
+  expiresAt: number
+}
+
+/**
+ * 获取服务端备用 access_token。
+ * 返回 null 表示未配置 / 刷新失败，此时请求将无 Authorization 头。
+ */
+async function getServerAccessToken(): Promise<string | null> {
+  // deno-lint-ignore no-explicit-any
+  const denoEnv = (globalThis as any).Deno?.env
+
+  // 1. 环境变量直接配置了 access_token（最高优先级，但有效期约 1h）
+  const envToken: string | undefined = denoEnv?.get('PIXIV_ACCESS_TOKEN')
+  if (envToken) return envToken
+
+  // 2. Deno KV 中的缓存
+  const kv = await getKv()
+  if (kv) {
+    const entry = await kv.get(['pixiv', 'access_token'])
+    const cached = entry?.value as CachedToken | undefined
+    // 保留 60s 余量防止临界过期
+    if (cached && cached.expiresAt > Date.now() + 60_000) {
+      return cached.token
+    }
+  }
+
+  // 3. 用 refresh_token 刷新
+  const refreshTokenValue: string | undefined = denoEnv?.get('PIXIV_REFRESH_TOKEN')
+  if (!refreshTokenValue) return null
+
+  try {
+    const form = new URLSearchParams({
+      client_id: PIXIV_CLIENT_ID,
+      client_secret: PIXIV_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      include_policy: 'true',
+      refresh_token: refreshTokenValue,
+    })
+    const resp = await fetch('https://oauth.secure.pixiv.net/auth/token', {
+      method: 'POST',
+      headers: pixivHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+      body: form.toString(),
+    })
+    if (!resp.ok) return null
+    const data = await resp.json() as { access_token?: string; expires_in?: number }
+    if (!data.access_token) return null
+
+    // 写入 KV（带 TTL）
+    const expiresIn = (data.expires_in || 3600)
+    const expiresAt = Date.now() + expiresIn * 1000
+    if (kv) {
+      await kv.set(
+        ['pixiv', 'access_token'],
+        { token: data.access_token, expiresAt } satisfies CachedToken,
+        { expireIn: expiresIn * 1000 },
+      )
+    }
+    return data.access_token
+  } catch {
+    return null
+  }
+}
+
 // ── 路由 ─────────────────────────────────────────────
 
 async function handleOAuthToken(req: Request): Promise<Response> {
@@ -204,10 +298,10 @@ async function handleOAuthToken(req: Request): Promise<Response> {
   })
 }
 
-async function handleAppApi(req: Request, url: URL): Promise<Response> {
+async function handleAppApi(req: Request, url: URL, fallbackToken?: string | null): Promise<Response> {
   const target = 'https://app-api.pixiv.net' + url.pathname.replace(/^\/app/, '') + url.search
   const headers = pixivHeaders()
-  const auth = req.headers.get('Authorization')
+  const auth = req.headers.get('Authorization') || (fallbackToken ? `Bearer ${fallbackToken}` : null)
   if (auth) headers['Authorization'] = auth
   const ct = req.headers.get('Content-Type')
   if (ct) headers['Content-Type'] = ct
@@ -262,7 +356,13 @@ async function handle(req: Request): Promise<Response> {
     if (url.pathname === '/oauth/auth/token') {
       resp = await handleOAuthToken(req)
     } else if (url.pathname.startsWith('/app/')) {
-      resp = await handleAppApi(req, url)
+      // 免登录分享：/app/webview/v2/novel 无 Authorization 时注入服务端备用 token
+      if (url.pathname === '/app/webview/v2/novel' && !req.headers.get('Authorization')) {
+        const serverToken = await getServerAccessToken()
+        resp = await handleAppApi(req, url, serverToken)
+      } else {
+        resp = await handleAppApi(req, url)
+      }
     } else if (url.pathname === '/image') {
       resp = await handleImage(url)
     } else if (url.pathname === '/' || url.pathname === '') {

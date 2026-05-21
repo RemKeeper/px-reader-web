@@ -14,3 +14,19 @@ compatibility_date = "2024-09-01"
 # routes = [
 #   { pattern = "px.example.com/*", zone_name = "example.com" }
 # ]
+
+# ── 免登录分享功能（可选） ──────────────────────────────
+# 配置后，分享链接无需用户登录即可查看小说正文：
+# 1. 先创建 KV namespace：wrangler kv:namespace create PIXIV_KV
+# 2. 将生成的 id 填入下方
+# 3. 在 Cloudflare Dashboard > Workers > 当前 Worker > Settings > Variables
+#    中添加 Secret：PIXIV_REFRESH_TOKEN = <你的 refresh_token>
+
+# [[kv_namespaces]]
+# binding = "PIXIV_KV"
+# id = "your_kv_namespace_id_here"
+
+# [vars]
+# # 可选：直接提供 access_token（有效期约 1 小时，优先级高于 refresh_token）
+# PIXIV_ACCESS_TOKEN = ""
+
