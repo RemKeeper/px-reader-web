@@ -76,7 +76,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useNovelStore, useBlockStore, useAuthStore } from '@/stores'
-import { useScrollRestore } from '@/composables'
+import { useScrollRestore, usePageTitle } from '@/composables'
 import { getProxiedImageUrl, followUser, unfollowUser } from '@/api'
 import { ApiError, type NovelMeta, type PixivUser } from '@/types'
 import NavBar from '@/components/NavBar.vue'
@@ -89,6 +89,9 @@ const router = useRouter()
 const novelStore = useNovelStore()
 const blockStore = useBlockStore()
 const authStore = useAuthStore()
+
+// 动态标题：显示用户名
+usePageTitle(() => userInfo.value?.name || '')
 const scrollRef = ref<HTMLElement | null>(null)
 
 useScrollRestore({

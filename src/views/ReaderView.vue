@@ -14,6 +14,12 @@
           <template #right>
             <div class="flex items-center gap-3">
               <van-icon
+                name="down"
+                size="20"
+                class="text-text"
+                @click="downloadNovel"
+              />
+              <van-icon
                 :name="isInShelf ? 'bookmark' : 'bookmark-o'"
                 size="20"
                 :class="isInShelf ? 'text-primary' : 'text-text'"
@@ -532,6 +538,7 @@ import { useNovelStore, useSettingsStore, useShelfStore, useAuthStore } from '@/
 import { splitChaptersInWorker } from '@/workers'
 import { getTxtCache } from '@/db'
 import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail } from '@/api'
+import { usePageTitle } from '@/composables'
 import {
   parseNovelMarkup,
   resolvePixivImageUrl,
@@ -654,6 +661,10 @@ function confirmRemoveSelection() {
 
 /** 当前作品元信息（从 store 缓存获取） */
 const novelMeta = ref<NovelMeta | null>(null)
+
+// 动态标题：显示小说名（必须放在 novelTitle / novelMeta 声明之后）
+usePageTitle(() => novelTitle.value || novelMeta.value?.title || '')
+
 const authorAvatar = computed(() => {
   const url = novelMeta.value?.user?.profile_image_urls?.medium
   return url ? getProxiedImageUrl(url) : ''
@@ -901,6 +912,25 @@ async function confirmTagBookmark() {
   } finally {
     bookmarkLoading.value = false
   }
+}
+
+function downloadNovel() {
+  if (!content.value) {
+    showToast('暂无文本可下载')
+    return
+  }
+  const name = (novelMeta.value?.title || novelTitle.value || 'novel').replace(/[/\\:*?"<>|]/g, '_')
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + content.value], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${name}.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  showToast('下载成功')
 }
 
 function showBookmarkDialog() {

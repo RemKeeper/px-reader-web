@@ -34,8 +34,12 @@
 <script setup lang="ts">
 import { watch, computed } from 'vue'
 import { useSettingsStore } from '@/stores'
+import { useSEO } from '@/composables'
 
 const settingsStore = useSettingsStore()
+
+// 全局 SEO：根据当前路由自动更新 title / meta
+useSEO()
 
 const keepAlivePages = ['HomeView', 'ShelfView', 'FollowView']
 
