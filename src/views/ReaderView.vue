@@ -42,8 +42,8 @@
               @click.stop
               @pointerdown.stop="onBookmarkPress"
               @pointerup.stop="onBookmarkRelease"
-              @pointerleave.stop="onBookmarkRelease"
-              @pointercancel.stop="onBookmarkRelease"
+              @pointerleave.stop="onBookmarkCancel"
+              @pointercancel.stop="onBookmarkCancel"
             >
               {{ novelMeta.is_bookmarked ? '已收藏' : '收藏' }}
             </van-button>
@@ -841,6 +841,13 @@ function onBookmarkRelease() {
   }
 }
 
+function onBookmarkCancel() {
+  if (pressTimer) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+}
+
 async function quickBookmark() {
   if (!novelMeta.value || bookmarkLoading.value) return
   bookmarkLoading.value = true
@@ -1029,6 +1036,29 @@ onMounted(async () => {
       loadError.value = novelStore.error || '加载失败，服务器未配置免登录 token，请登录后查看'
     }
     loading.value = false
+  }
+
+  // 将小说记录到独立的阅读历史中（不影响书架）
+  {
+    const m = novelMeta.value
+    const title = m?.title || novelTitle.value || `小说 #${novelId}`
+    shelfStore.saveReadingHistory({
+      id: Number(novelId),
+      title,
+      coverUrl: m?.image_urls?.large || m?.image_urls?.medium || '',
+      authorName: m?.user?.name || '',
+      authorId: m?.user?.id || 0,
+      authorAvatar: m?.user?.profile_image_urls?.medium || '',
+      caption: m?.caption || '',
+      tags: m?.tags?.map((t) => ({ name: t.name, translated_name: t.translated_name })) || [],
+      textLength: m?.text_length || content.value.length,
+      totalBookmarks: m?.total_bookmarks || 0,
+      totalView: m?.total_view || 0,
+      isXRestricted: !!m?.is_x_restricted,
+      series: m?.series?.id ? { id: m.series.id, title: m.series.title } : undefined,
+      addedAt: Date.now(),
+      lastReadAt: Date.now(),
+    })
   }
 
   // 恢复阅读进度

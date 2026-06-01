@@ -6,6 +6,7 @@ export class PxReaderDB extends Dexie {
   progress!: Table<ReadingProgress, number>
   bookmarks!: Table<Bookmark, number>
   txtCache!: Table<TxtFileCache, string>
+  readingHistory!: Table<LocalNovelMeta, number>
 
   constructor() {
     super('px-reader-db')
@@ -15,6 +16,15 @@ export class PxReaderDB extends Dexie {
       progress: 'novelId, updatedAt',
       bookmarks: '++id, novelId, createdAt',
       txtCache: 'id, fileName, importedAt',
+    })
+
+    // v2: 新增独立的阅读历史表（与书架分离）
+    this.version(2).stores({
+      novels: 'id, title, authorId, addedAt, lastReadAt',
+      progress: 'novelId, updatedAt',
+      bookmarks: '++id, novelId, createdAt',
+      txtCache: 'id, fileName, importedAt',
+      readingHistory: 'id, lastReadAt',
     })
   }
 }
@@ -67,6 +77,11 @@ export async function updateNovelLastRead(id: number): Promise<void> {
   await db.novels.update(id, { lastReadAt: Date.now() })
 }
 
+/** 获取最近阅读的小说（按最后阅读时间倒序，最多 limit 本） */
+export async function getRecentNovels(limit = 100): Promise<LocalNovelMeta[]> {
+  return db.novels.orderBy('lastReadAt').reverse().limit(limit).toArray()
+}
+
 // ── Progress CRUD ─────────────────────────────────────
 
 export async function saveProgress(progress: ReadingProgress): Promise<void> {
@@ -107,4 +122,21 @@ export async function getAllTxtCaches(): Promise<TxtFileCache[]> {
 
 export async function removeTxtCache(id: string): Promise<void> {
   await db.txtCache.delete(id)
+}
+
+// ── Reading History CRUD ──────────────────────────────
+
+/** 保存阅读历史条目（存在则更新 lastReadAt，不存在则新增） */
+export async function saveReadingHistory(entry: LocalNovelMeta): Promise<void> {
+  const existing = await db.readingHistory.get(entry.id)
+  if (existing) {
+    await db.readingHistory.update(entry.id, { lastReadAt: entry.lastReadAt })
+  } else {
+    await db.readingHistory.put(entry)
+  }
+}
+
+/** 获取阅读历史列表（按最后阅读时间倒序） */
+export async function getReadingHistory(limit = 100): Promise<LocalNovelMeta[]> {
+  return db.readingHistory.orderBy('lastReadAt').reverse().limit(limit).toArray()
 }

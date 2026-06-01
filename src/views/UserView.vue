@@ -90,6 +90,8 @@ const novelStore = useNovelStore()
 const blockStore = useBlockStore()
 const authStore = useAuthStore()
 
+const userInfo = ref<PixivUser | null>(null)
+
 // 动态标题：显示用户名
 usePageTitle(() => userInfo.value?.name || '')
 const scrollRef = ref<HTMLElement | null>(null)
@@ -102,7 +104,6 @@ useScrollRestore({
 const loading = ref(true)
 const loadingMore = ref(false)
 const followLoading = ref(false)
-const userInfo = ref<PixivUser | null>(null)
 const novels = ref<NovelMeta[]>([])
 const nextUrl = ref<string | null>(null)
 const avatarFailed = ref(false)

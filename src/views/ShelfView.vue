@@ -1,6 +1,6 @@
 <template>
   <div class="shelf-view h-[100vh] h-[100dvh] bg-bg flex flex-col overflow-hidden">
-    <NavBar :title="activeTab === 0 ? '书架' : '收藏'">
+    <NavBar :title="tabTitle">
       <template #left>
         <div class="flex items-center gap-1 ml-1" @click.stop>
           <button
@@ -13,6 +13,11 @@
             :class="{ active: activeTab === 1 }"
             @click="switchTab(1)"
           >收藏</button>
+          <button
+            class="tab-btn"
+            :class="{ active: activeTab === 2 }"
+            @click="switchTab(2)"
+          >历史</button>
         </div>
       </template>
       <template #right>
@@ -103,7 +108,7 @@
       </template>
 
       <!-- 收藏 Tab -->
-      <template v-else>
+      <template v-else-if="activeTab === 1">
         <div v-if="novelStore.bookmarksLoading && novelStore.bookmarks.length === 0" class="py-12">
           <van-loading type="spinner" color="var(--color-primary)" class="flex-center" />
         </div>
@@ -157,6 +162,73 @@
           </div>
         </template>
       </template>
+
+      <!-- 历史 Tab -->
+      <template v-else-if="activeTab === 2">
+        <EmptyState
+          v-if="shelfStore.recentNovels.length === 0"
+          message="暂无阅读历史"
+          icon="clock-o"
+        />
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="novel in shelfStore.recentNovels"
+            :key="novel.id"
+            class="bg-surface rounded-xl p-3 flex gap-3 cursor-pointer active:scale-98 transition-transform"
+            @click="goToNovel(novel.id)"
+          >
+            <div class="w-16 h-22 rounded-lg overflow-hidden flex-shrink-0 bg-bg">
+              <img
+                v-if="novel.coverUrl"
+                :src="getProxiedImageUrl(novel.coverUrl)"
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
+              <div v-else class="w-full h-full flex-center text-text-secondary text-xs">TXT</div>
+            </div>
+            <div class="flex-1 min-w-0 flex flex-col justify-between">
+              <div>
+                <h3 class="text-text text-sm font-bold text-ellipsis">{{ novel.title }}</h3>
+                <div
+                  v-if="novel.authorName"
+                  class="flex items-center gap-1 mt-1 w-fit"
+                  @click.stop="goToAuthor(novel.authorId)"
+                >
+                  <img
+                    v-if="novel.authorAvatar"
+                    :src="getProxiedImageUrl(novel.authorAvatar)"
+                    class="w-4 h-4 rounded-full object-cover"
+                  />
+                  <span class="text-text-secondary text-xs hover:text-primary transition-colors">
+                    {{ novel.authorName }}
+                  </span>
+                </div>
+                <NovelStats
+                  :text-length="novel.textLength"
+                  :bookmarks="novel.totalBookmarks"
+                  :views="novel.totalView"
+                  size="sm"
+                  class="mt-1.5"
+                />
+                <NovelTags
+                  v-if="novel.tags?.length"
+                  :tags="novel.tags"
+                  :max="3"
+                  expandable
+                  size="sm"
+                  class="mt-1.5"
+                />
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-text-secondary text-xs">
+                  {{ formatTime(novel.lastReadAt) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <TabBar />
@@ -164,7 +236,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useShelfStore, useNovelStore } from '@/stores'
@@ -192,11 +264,17 @@ onMounted(() => {
   shelfStore.loadShelf()
 })
 
+const tabLabels = ['书架', '收藏', '历史']
+const tabTitle = computed(() => tabLabels[activeTab.value])
+
 function switchTab(index: number) {
   activeTab.value = index
   if (index === 1 && novelStore.bookmarks.length === 0) {
     novelStore.loadBookmarks(true)
     novelStore.loadBookmarkTags()
+  }
+  if (index === 2 && shelfStore.recentNovels.length === 0) {
+    shelfStore.loadRecentNovels()
   }
 }
 

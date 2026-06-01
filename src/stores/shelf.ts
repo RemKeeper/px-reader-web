@@ -5,6 +5,7 @@ import * as db from '@/db'
 
 export const useShelfStore = defineStore('shelf', () => {
   const novels = ref<LocalNovelMeta[]>([])
+  const recentNovels = ref<LocalNovelMeta[]>([])
   const loading = ref(false)
 
   const novelCount = computed(() => novels.value.length)
@@ -42,6 +43,16 @@ export const useShelfStore = defineStore('shelf', () => {
     await loadShelf()
   }
 
+  /** 加载最近阅读（从独立的阅读历史表） */
+  async function loadRecentNovels() {
+    recentNovels.value = await db.getReadingHistory(100)
+  }
+
+  /** 保存阅读历史 */
+  async function saveReadingHistory(entry: LocalNovelMeta) {
+    await db.saveReadingHistory(entry)
+  }
+
   // ── 阅读进度 ──────────────────────────────────────
 
   async function saveProgress(progress: ReadingProgress) {
@@ -68,6 +79,7 @@ export const useShelfStore = defineStore('shelf', () => {
 
   return {
     novels,
+    recentNovels,
     loading,
     novelCount,
     loadShelf,
@@ -75,6 +87,8 @@ export const useShelfStore = defineStore('shelf', () => {
     removeFromShelf,
     isInShelf,
     touchNovel,
+    loadRecentNovels,
+    saveReadingHistory,
     saveProgress,
     getProgress,
     addBookmark,

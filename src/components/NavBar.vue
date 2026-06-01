@@ -10,7 +10,7 @@
     :border="false"
     :style="{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }"
   >
-    <template #left>
+    <template v-if="$slots.left" #left>
       <slot name="left" />
     </template>
     <template #title>
