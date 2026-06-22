@@ -103,8 +103,12 @@ function goToNovel(id: number) {
 function onSubmit() {
   const w = word.value.trim()
   if (!w) return
+  if (w === novelStore.searchKeyword && novelStore.search.length > 0) return
+  if (String(route.query.word || '').trim() === w) {
+    novelStore.loadSearch(w, true)
+    return
+  }
   router.replace({ path: '/search', query: { word: w } })
-  novelStore.loadSearch(w, true)
 }
 
 async function onLoadMore() {

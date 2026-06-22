@@ -41,7 +41,7 @@ const settingsStore = useSettingsStore()
 // 全局 SEO：根据当前路由自动更新 title / meta
 useSEO()
 
-const keepAlivePages = ['HomeView', 'ShelfView', 'FollowView']
+const keepAlivePages = ['HomeView', 'ShelfView', 'FollowView', 'SearchView']
 
 /** OLED 极端黑色模式：将文字/边框亮度作为 CSS 变量注入，由 CSS 消费 */
 const oledCssVars = computed(() => {
