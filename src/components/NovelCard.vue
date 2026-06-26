@@ -24,6 +24,7 @@
         <span
           v-if="novel.series?.id"
           class="absolute bottom-1 left-1 right-1 text-[10px] px-1 py-0.5 rounded bg-black/60 text-white text-ellipsis"
+          @click.stop="$emit('seriesClick', novel.series.id)"
         >{{ novel.series.title }}</span>
       </div>
 
@@ -88,6 +89,7 @@ const props = defineProps<{
 
 defineEmits<{
   click: []
+  seriesClick: [id: number]
 }>()
 
 const imgFailed = ref(false)

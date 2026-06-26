@@ -35,6 +35,10 @@ export const useNovelStore = defineStore('novel', () => {
     return metaById.value[Number(id)]
   }
 
+  function cacheNovelMetas(list: NovelMeta[]) {
+    cacheMetas(list)
+  }
+
   /** 关注列表 */
   const follow = ref<NovelMeta[]>([])
   const followNextUrl = ref<string | null>(null)
@@ -46,6 +50,8 @@ export const useNovelStore = defineStore('novel', () => {
   const currentText = ref('')
   const currentIllusts = ref<NovelTextResponse['illusts']>(undefined)
   const currentImages = ref<NovelTextResponse['images']>(undefined)
+  const currentSeriesPrev = ref<NovelTextResponse['series_prev']>({})
+  const currentSeriesNext = ref<NovelTextResponse['series_next']>({})
   const currentTextLoading = ref(false)
 
   /** 错误 */
@@ -267,6 +273,8 @@ export const useNovelStore = defineStore('novel', () => {
       currentText.value = res.novel_text
       currentIllusts.value = res.illusts
       currentImages.value = res.images
+      currentSeriesPrev.value = res.series_prev || {}
+      currentSeriesNext.value = res.series_next || {}
       return res.novel_text
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -297,6 +305,8 @@ export const useNovelStore = defineStore('novel', () => {
     currentText,
     currentIllusts,
     currentImages,
+    currentSeriesPrev,
+    currentSeriesNext,
     currentTextLoading,
     error,
     loadRecommended,
@@ -312,6 +322,7 @@ export const useNovelStore = defineStore('novel', () => {
     loadBookmarks,
     loadBookmarkTags,
     filterBookmarksByTag,
+    cacheNovelMetas,
     loadNovelText,
   }
 }, {

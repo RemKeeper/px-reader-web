@@ -16,6 +16,7 @@ import type {
   RecommendedNovelsResponse,
   FollowNovelsResponse,
   UserNovelsResponse,
+  NovelSeriesResponse,
   NovelTextResponse,
   BookmarkDetailResponse,
   BookmarkTagsResponse,
@@ -272,6 +273,36 @@ export function getUserNovels(params: {
     query: {
       user_id: String(params.user_id),
       offset: params.offset,
+    },
+  })
+}
+
+/** 获取小说系列详情与作品列表 */
+export function getNovelSeries(params: {
+  series_id: string | number
+  last_order?: string
+  offset?: string
+  next_url?: string
+}): Promise<NovelSeriesResponse> {
+  if (params.next_url) {
+    try {
+      const u = new URL(params.next_url)
+      const q: Record<string, string | undefined> = {}
+      u.searchParams.forEach((v, k) => { q[k] = v })
+      if (!q.series_id) q.series_id = String(params.series_id)
+      if (!q.filter) q.filter = 'for_ios'
+      return apiRequest<NovelSeriesResponse>('/v2/novel/series', { query: q })
+    } catch {
+      // next_url 解析失败，回退到常规请求
+    }
+  }
+
+  return apiRequest<NovelSeriesResponse>('/v2/novel/series', {
+    query: {
+      series_id: String(params.series_id),
+      last_order: params.last_order,
+      offset: params.offset,
+      filter: 'for_ios',
     },
   })
 }

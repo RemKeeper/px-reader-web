@@ -27,6 +27,13 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    path: '/series/:id',
+    name: 'series',
+    component: () => import('@/views/SeriesView.vue'),
+    meta: { title: '小说系列' },
+    props: true,
+  },
+  {
     path: '/user/:id',
     name: 'user',
     component: () => import('@/views/UserView.vue'),

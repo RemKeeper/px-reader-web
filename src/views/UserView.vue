@@ -51,6 +51,7 @@
             :key="novel.id"
             :novel="novel"
             @click="goToNovel(novel.id)"
+            @series-click="goToSeries"
           />
         </div>
 
@@ -171,6 +172,10 @@ const avatarSrc = computed(() => {
 
 function goToNovel(id: number) {
   router.push(`/novel/${id}`)
+}
+
+function goToSeries(id: number) {
+  router.push(`/series/${id}`)
 }
 
 async function loadMore() {

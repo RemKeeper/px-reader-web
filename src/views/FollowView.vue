@@ -67,6 +67,7 @@
                   :key="novel.id"
                   :novel="novel"
                   @click="goToNovel(novel.id)"
+                  @series-click="goToSeries"
                 />
               </div>
             </van-list>
@@ -171,5 +172,9 @@ onActivated(() => {
 
 function goToNovel(id: number) {
   router.push(`/novel/${id}`)
+}
+
+function goToSeries(id: number) {
+  router.push(`/series/${id}`)
 }
 </script>

@@ -35,6 +35,18 @@ export interface NovelSeries {
   title: string
 }
 
+/** 小说系列详情 */
+export interface NovelSeriesDetail {
+  id: number
+  title: string
+  caption?: string
+  cover_image_urls?: NovelImageUrls
+  series_work_count?: number
+  create_date?: string
+  user?: PixivUser
+  display_text?: string
+}
+
 /** 小说元数据 */
 export interface NovelMeta {
   id: number
@@ -82,6 +94,15 @@ export interface FollowNovelsResponse {
 /** 用户小说响应 */
 export interface UserNovelsResponse {
   user: PixivUser
+  novels: NovelMeta[]
+  next_url: string | null
+}
+
+/** 小说系列响应 */
+export interface NovelSeriesResponse {
+  novel_series_detail: NovelSeriesDetail
+  novel_series_first_novel?: NovelMeta
+  novel_series_latest_novel?: NovelMeta
   novels: NovelMeta[]
   next_url: string | null
 }

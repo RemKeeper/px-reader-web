@@ -62,6 +62,15 @@
             </span>
             <van-icon name="arrow" size="12" class="text-text-secondary" />
           </div>
+          <div
+            v-if="novelMeta.series?.id"
+            class="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full bg-bg text-text-secondary text-xs cursor-pointer"
+            @click.stop="goToSeries"
+          >
+            <van-icon name="orders-o" size="12" />
+            <span class="text-ellipsis max-w-64">{{ novelMeta.series.title }}</span>
+            <van-icon name="arrow" size="10" />
+          </div>
           <NovelStats
             :text-length="novelMeta.text_length"
             :bookmarks="novelMeta.total_bookmarks"
@@ -238,12 +247,12 @@
         <!-- 操作按钮 -->
         <div class="flex items-center justify-around py-3 px-4">
           <div
-            v-if="hasNaturalChapters"
+            v-if="showPrevButton"
             class="flex-col-center cursor-pointer"
             @click="prevChapter"
           >
             <van-icon name="arrow-left" size="20" class="text-text" />
-            <span class="text-xs text-text-secondary mt-1">上一章</span>
+            <span class="text-xs text-text-secondary mt-1">{{ prevButtonText }}</span>
           </div>
           <div class="flex-col-center cursor-pointer" @click="showSettings = true">
             <van-icon name="font-o" size="20" class="text-text" />
@@ -254,12 +263,12 @@
             <span class="text-xs text-text-secondary mt-1">书签</span>
           </div>
           <div
-            v-if="hasNaturalChapters"
+            v-if="showNextButton"
             class="flex-col-center cursor-pointer"
             @click="nextChapter"
           >
             <van-icon name="arrow" size="20" class="text-text" />
-            <span class="text-xs text-text-secondary mt-1">下一章</span>
+            <span class="text-xs text-text-secondary mt-1">{{ nextButtonText }}</span>
           </div>
         </div>
       </div>
@@ -695,6 +704,12 @@ function goToAuthor() {
   router.push(`/user/${uid}`)
 }
 
+function goToSeries() {
+  const seriesId = novelMeta.value?.series?.id
+  if (!seriesId) return
+  router.push(`/series/${seriesId}`)
+}
+
 const fontOptions = [
   { label: '黑体', value: 'sans' },
   { label: '宋体', value: 'serif' },
@@ -707,11 +722,12 @@ const themeOptions = [
   { label: '护眼', value: 'sepia', color: '#f4ecd8' },
 ]
 
-const menuActions = [
+const menuActions = computed(() => [
   { name: '加入/移除书架', value: 'shelf' },
+  ...(novelMeta.value?.series?.id ? [{ name: '查看系列', value: 'series' }] : []),
   { name: '查看书签', value: 'bookmarks' },
   { name: '分享', value: 'share' },
-]
+])
 
 function setChapterRef(index: number, el: HTMLElement | null) {
   if (el) chapterRefs.value.set(index, el)
@@ -733,6 +749,12 @@ function chapterTokens(ch: TxtChapter): NovelToken[] {
 
 const illustsRef = computed(() => novelStore.currentIllusts)
 const imagesRef = computed(() => novelStore.currentImages)
+const seriesPrevNovelId = computed(() => extractSeriesNovelId(novelStore.currentSeriesPrev))
+const seriesNextNovelId = computed(() => extractSeriesNovelId(novelStore.currentSeriesNext))
+const showPrevButton = computed(() => hasNaturalChapters.value || !!seriesPrevNovelId.value)
+const showNextButton = computed(() => hasNaturalChapters.value || !!seriesNextNovelId.value)
+const prevButtonText = computed(() => activeChapter.value > 0 ? '上一章' : '上一篇')
+const nextButtonText = computed(() => activeChapter.value < chapters.value.length - 1 ? '下一章' : '下一篇')
 
 function resolveIllust(illustId: string, page: number): string | null {
   const url = resolvePixivImageUrl(illustsRef.value, illustId, page)
@@ -742,6 +764,12 @@ function resolveIllust(illustId: string, page: number): string | null {
 function resolveUploaded(imageId: string): string | null {
   const url = resolveUploadedImageUrl(imagesRef.value, imageId)
   return url ? getProxiedImageUrl(url) : null
+}
+
+function extractSeriesNovelId(value: Record<string, unknown> | undefined): number | null {
+  const id = value?.id || value?.novel_id || value?.novelId
+  const numericId = Number(id)
+  return Number.isFinite(numericId) && numericId > 0 ? numericId : null
 }
 
 watch(() => content.value, () => tokensCache.clear())
@@ -779,11 +807,13 @@ function updateProgress() {
 
 function prevChapter() {
   if (activeChapter.value > 0) scrollToChapter(activeChapter.value - 1)
+  else if (seriesPrevNovelId.value) router.push(`/novel/${seriesPrevNovelId.value}`)
   else showToast('已经是第一章了')
 }
 
 function nextChapter() {
   if (activeChapter.value < chapters.value.length - 1) scrollToChapter(activeChapter.value + 1)
+  else if (seriesNextNovelId.value) router.push(`/novel/${seriesNextNovelId.value}`)
   else showToast('已经是最后一章了')
 }
 
@@ -966,6 +996,7 @@ function showBookmarkDialog() {
 function onMenuSelect(action: { value: string }) {
   showMenu.value = false
   if (action.value === 'shelf') toggleShelf()
+  else if (action.value === 'series') goToSeries()
   else if (action.value === 'bookmarks') showToast('书签功能开发中')
   else if (action.value === 'share') {
     const shareUrl = window.location.href

@@ -44,6 +44,7 @@
             :key="novel.id"
             :novel="novel"
             @click="goToNovel(novel.id)"
+            @series-click="goToSeries"
           />
         </div>
       </van-list>
@@ -98,6 +99,10 @@ function goBack() {
 
 function goToNovel(id: number) {
   router.push(`/novel/${id}`)
+}
+
+function goToSeries(id: number) {
+  router.push(`/series/${id}`)
 }
 
 function onSubmit() {

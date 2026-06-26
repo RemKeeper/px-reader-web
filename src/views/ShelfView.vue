@@ -148,6 +148,7 @@
               :key="novel.id"
               :novel="novel"
               @click="goToNovel(novel.id)"
+              @series-click="goToSeries"
             />
 
             <div class="py-6 text-center">
@@ -284,6 +285,10 @@ function selectTag(tag: string | null) {
 
 function goToNovel(id: number) {
   router.push(`/novel/${id}`)
+}
+
+function goToSeries(id: number) {
+  router.push(`/series/${id}`)
 }
 
 function goToAuthor(authorId: number) {
