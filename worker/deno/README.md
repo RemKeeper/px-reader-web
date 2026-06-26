@@ -13,6 +13,7 @@
 | POST | `/oauth/auth/token` | `https://oauth.secure.pixiv.net/auth/token` |
 | ANY | `/app/<path>` | `https://app-api.pixiv.net/<path>` |
 | GET | `/image?url=<encoded>` | `*.pximg.net` |
+| POST | `/translate/deeplx` | 自定义 DeepLX 兼容接口 |
 | GET | `/` | 健康检查（返回 `px-reader proxy ok (deno)`） |
 
 ## 本地调试

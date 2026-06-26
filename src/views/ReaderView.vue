@@ -463,6 +463,35 @@
             </div>
           </div>
           <div class="context-menu-section">
+            <span class="context-menu-label">翻译全文</span>
+            <button class="ctx-action-btn ctx-action-btn--compact" @click="toggleTranslationPanel">
+              <van-icon name="comment-o" size="14" />
+              <span>{{ showTranslationPanel ? '收起设置' : '翻译设置' }}</span>
+            </button>
+            <div v-if="showTranslationPanel" class="mt-2 space-y-2">
+              <input
+                v-model="translationApiUrl"
+                class="ctx-replace-input"
+                placeholder="https://your-deeplx/translate"
+              />
+              <div class="flex gap-2">
+                <select v-model="translationSourceLang" class="ctx-select">
+                  <option v-for="opt in translationLanguageOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <select v-model="translationTargetLang" class="ctx-select">
+                  <option v-for="opt in translationLanguageOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <button class="ctx-action-btn ctx-action-btn--compact" :disabled="translationLoading" @click="translateFullText">
+                <span>{{ translationLoading ? '翻译中…' : '开始翻译' }}</span>
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-section">
             <span class="context-menu-label">字号</span>
             <div class="flex items-center gap-2">
               <van-button
@@ -580,7 +609,7 @@ import { showToast } from 'vant'
 import { useNovelStore, useSettingsStore, useShelfStore, useAuthStore } from '@/stores'
 import { splitChaptersInWorker } from '@/workers'
 import { getTxtCache } from '@/db'
-import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail } from '@/api'
+import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail, translateWithDeepLX } from '@/api'
 import { usePageTitle } from '@/composables'
 import {
   parseNovelMarkup,
@@ -631,6 +660,11 @@ const selectedText = ref('')
 const hasSelection = ref(false)
 const showReplaceDialog = ref(false)
 const replaceInput = ref('')
+const showTranslationPanel = ref(false)
+const translationApiUrl = ref('')
+const translationSourceLang = ref('auto')
+const translationTargetLang = ref('ZH')
+const translationLoading = ref(false)
 
 const truncatedSelection = computed(() => {
   const s = selectedText.value
@@ -662,6 +696,36 @@ function onContextMenu(e: MouseEvent) {
 
 function closeContextMenu() {
   showContextMenu.value = false
+}
+
+function inferBrowserTargetLanguage(): string {
+  const lang = (navigator.language || 'en-US').toLowerCase()
+  if (lang.startsWith('zh')) return 'ZH'
+  if (lang.startsWith('ja')) return 'JA'
+  if (lang.startsWith('ko')) return 'KO'
+  if (lang.startsWith('fr')) return 'FR'
+  if (lang.startsWith('de')) return 'DE'
+  if (lang.startsWith('es')) return 'ES'
+  if (lang.startsWith('it')) return 'IT'
+  if (lang.startsWith('pt')) return 'PT'
+  if (lang.startsWith('ru')) return 'RU'
+  return 'EN'
+}
+
+function saveTranslationSettings() {
+  settingsStore.updateSettings({
+    translationApiUrl: translationApiUrl.value.trim(),
+    translationSourceLang: translationSourceLang.value,
+    translationTargetLang: translationTargetLang.value,
+  })
+}
+
+function toggleTranslationPanel() {
+  showTranslationPanel.value = !showTranslationPanel.value
+  if (!showTranslationPanel.value) return
+  translationApiUrl.value = settingsStore.settings.translationApiUrl || translationApiUrl.value
+  translationSourceLang.value = settingsStore.settings.translationSourceLang || 'auto'
+  translationTargetLang.value = settingsStore.settings.translationTargetLang || inferBrowserTargetLanguage()
 }
 
 function adjustFontSize(delta: number) {
@@ -703,6 +767,37 @@ async function convertFullText(mode: 't2s' | 's2t') {
   hasNaturalChapters.value = result.hasNaturalSplits
   closeContextMenu()
   showToast(mode === 't2s' ? '全文已转换为简体' : '全文已转换为繁体')
+}
+
+async function translateFullText() {
+  if (!content.value) return
+  const url = translationApiUrl.value.trim()
+  if (!url) {
+    showToast('请先填写 DeepLX 兼容接口地址')
+    return
+  }
+
+  saveTranslationSettings()
+  translationLoading.value = true
+  try {
+    const translated = await translateWithDeepLX({
+      url,
+      text: content.value,
+      sourceLang: translationSourceLang.value,
+      targetLang: translationTargetLang.value,
+    })
+    content.value = translated
+    tokensCache.clear()
+    const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+    chapters.value = result.chapters
+    hasNaturalChapters.value = result.hasNaturalSplits
+    closeContextMenu()
+    showToast('全文翻译已完成')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '翻译失败')
+  } finally {
+    translationLoading.value = false
+  }
 }
 
 async function onReplaceConfirm(action: 'confirm' | 'cancel') {
@@ -769,6 +864,21 @@ const fontOptions = [
   { label: '黑体', value: 'sans' },
   { label: '宋体', value: 'serif' },
   { label: '等宽', value: 'mono' },
+]
+
+const translationLanguageOptions = [
+  { label: '自动检测', value: 'auto' },
+  { label: '简体中文', value: 'ZH' },
+  { label: '繁體中文', value: 'ZH-HANT' },
+  { label: 'English', value: 'EN' },
+  { label: '日本語', value: 'JA' },
+  { label: '한국어', value: 'KO' },
+  { label: 'Français', value: 'FR' },
+  { label: 'Deutsch', value: 'DE' },
+  { label: 'Español', value: 'ES' },
+  { label: 'Italiano', value: 'IT' },
+  { label: 'Português', value: 'PT' },
+  { label: 'Русский', value: 'RU' },
 ]
 
 const themeOptions = [
@@ -1085,6 +1195,10 @@ function saveCurrentProgress() {
   }
 }
 
+watch([translationApiUrl, translationSourceLang, translationTargetLang], () => {
+  saveTranslationSettings()
+}, { flush: 'sync' })
+
 onMounted(async () => {
   const novelId = props.id
 
@@ -1123,6 +1237,10 @@ onMounted(async () => {
     }
     loading.value = false
   }
+
+  translationApiUrl.value = settingsStore.settings.translationApiUrl || translationApiUrl.value
+  translationSourceLang.value = settingsStore.settings.translationSourceLang || 'auto'
+  translationTargetLang.value = settingsStore.settings.translationTargetLang || inferBrowserTargetLanguage()
 
   // 将小说记录到独立的阅读历史中（不影响书架）
   {
@@ -1296,6 +1414,17 @@ onMounted(async () => {
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+.ctx-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 12px;
 }
 

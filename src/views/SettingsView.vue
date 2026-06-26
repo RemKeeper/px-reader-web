@@ -103,6 +103,19 @@
         </van-cell-group>
       </div>
 
+      <!-- 翻译设置 -->
+      <div class="bg-surface rounded-xl overflow-hidden">
+        <van-cell-group :border="false" title="翻译设置">
+          <van-cell title="DeepLX 接口地址" :label="settings.translationApiUrl ? settings.translationApiUrl : '留空则使用阅读页内手动输入'">
+            <template #right-icon>
+              <van-button size="mini" @click="showTranslationConfig = true">配置</van-button>
+            </template>
+          </van-cell>
+          <van-cell title="默认源语言" :value="translationSourceLabel" is-link @click="showTranslationSourcePicker = true" />
+          <van-cell title="默认目标语言" :value="translationTargetLabel" is-link @click="showTranslationTargetPicker = true" />
+        </van-cell-group>
+      </div>
+
       <!-- HDR 屏幕护眼适配（实验性） -->
       <div class="bg-surface rounded-xl overflow-hidden">
         <van-cell-group :border="false" title="显示与护眼">
@@ -365,6 +378,76 @@
       </div>
     </van-popup>
 
+    <!-- 翻译配置 -->
+    <van-popup
+      v-model:show="showTranslationConfig"
+      teleport="body"
+      round
+      closeable
+      class="center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '560px', top: popupViewportTop }"
+    >
+      <div class="center-modal__header">翻译配置</div>
+      <div class="p-4 pt-2 space-y-3 center-modal__content">
+        <van-field
+          v-model="translationApiUrlInput"
+          label="接口地址"
+          placeholder="https://your-deeplx/translate"
+          autosize
+        />
+        <div class="flex gap-2">
+          <van-button block plain @click="showTranslationConfig = false">取消</van-button>
+          <van-button block type="primary" @click="saveTranslationConfig">保存</van-button>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 源语言选择 -->
+    <van-popup
+      v-model:show="showTranslationSourcePicker"
+      teleport="body"
+      round
+      closeable
+      class="center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '460px', top: popupViewportTop }"
+    >
+      <div class="center-modal__header">选择源语言</div>
+      <div class="p-4 pt-2 space-y-2 center-modal__content">
+        <van-button
+          v-for="opt in translationLanguageOptions"
+          :key="opt.value"
+          block
+          :type="settings.translationSourceLang === opt.value ? 'primary' : 'default'"
+          @click="settingsStore.updateSettings({ translationSourceLang: opt.value }); showTranslationSourcePicker = false"
+        >
+          {{ opt.label }}
+        </van-button>
+      </div>
+    </van-popup>
+
+    <!-- 目标语言选择 -->
+    <van-popup
+      v-model:show="showTranslationTargetPicker"
+      teleport="body"
+      round
+      closeable
+      class="center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '460px', top: popupViewportTop }"
+    >
+      <div class="center-modal__header">选择目标语言</div>
+      <div class="p-4 pt-2 space-y-2 center-modal__content">
+        <van-button
+          v-for="opt in translationLanguageOptions"
+          :key="opt.value"
+          block
+          :type="settings.translationTargetLang === opt.value ? 'primary' : 'default'"
+          @click="settingsStore.updateSettings({ translationTargetLang: opt.value }); showTranslationTargetPicker = false"
+        >
+          {{ opt.label }}
+        </van-button>
+      </div>
+    </van-popup>
+
     <!-- 手动填写 refresh_token -->
     <van-popup
       v-model:show="showManualLogin"
@@ -429,8 +512,12 @@ const settings = computed(() => settingsStore.settings)
 
 const showFontPicker = ref(false)
 const showThemePicker = ref(false)
+const showTranslationConfig = ref(false)
+const showTranslationSourcePicker = ref(false)
+const showTranslationTargetPicker = ref(false)
 const showManualLogin = ref(false)
 const manualToken = ref('')
+const translationApiUrlInput = ref('')
 const popupViewportTop = ref('50%')
 const settingsScrollRef = ref<HTMLElement | null>(null)
 
@@ -465,7 +552,7 @@ function unbindPopupPositionEvents() {
 }
 
 watch(
-  () => [showFontPicker.value, showThemePicker.value, showManualLogin.value],
+  () => [showFontPicker.value, showThemePicker.value, showTranslationConfig.value, showTranslationSourcePicker.value, showTranslationTargetPicker.value, showManualLogin.value],
   (flags) => {
     const visible = flags.some(Boolean)
     if (visible) {
@@ -498,6 +585,7 @@ onMounted(() => {
   prevBodyOverflow = document.body.style.overflow
   document.documentElement.style.overflow = 'hidden'
   document.body.style.overflow = 'hidden'
+  translationApiUrlInput.value = settings.value.translationApiUrl || ''
   settingsScrollRef.value?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
 })
 
@@ -513,15 +601,48 @@ const themeOptions = [
   { label: '护眼模式', value: 'sepia' },
 ]
 
+const translationLanguageOptions = [
+  { label: '自动检测', value: 'auto' },
+  { label: '简体中文', value: 'ZH' },
+  { label: '繁體中文', value: 'ZH-HANT' },
+  { label: 'English', value: 'EN' },
+  { label: '日本語', value: 'JA' },
+  { label: '한국어', value: 'KO' },
+  { label: 'Français', value: 'FR' },
+  { label: 'Deutsch', value: 'DE' },
+  { label: 'Español', value: 'ES' },
+  { label: 'Italiano', value: 'IT' },
+  { label: 'Português', value: 'PT' },
+  { label: 'Русский', value: 'RU' },
+]
+
 const fontLabel = computed(() => {
   const f = fontOptions.find((o) => o.value === settings.value.fontFamily)
   return f?.label || '宋体'
+})
+
+const translationSourceLabel = computed(() => {
+  const opt = translationLanguageOptions.find((o) => o.value === settings.value.translationSourceLang)
+  return opt?.label || '自动检测'
+})
+
+const translationTargetLabel = computed(() => {
+  const opt = translationLanguageOptions.find((o) => o.value === settings.value.translationTargetLang)
+  return opt?.label || '中文'
 })
 
 const themeLabel = computed(() => {
   const t = themeOptions.find((o) => o.value === settings.value.theme)
   return t?.label || '深色模式'
 })
+
+function saveTranslationConfig() {
+  settingsStore.updateSettings({
+    translationApiUrl: translationApiUrlInput.value.trim(),
+  })
+  showTranslationConfig.value = false
+  showToast('翻译配置已保存')
+}
 
 function adjustFontSize(delta: number) {
   const v = Math.max(12, Math.min(32, settings.value.fontSize + delta))

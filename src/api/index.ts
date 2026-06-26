@@ -160,6 +160,58 @@ export function hasTokens(): boolean {
   return !!loadTokens()
 }
 
+// ── DeepLX / 兼容接口翻译 ───────────────────────────
+
+export interface DeepLXTranslatePayload {
+  url: string
+  text: string
+  sourceLang: string
+  targetLang: string
+}
+
+export async function translateWithDeepLX(payload: DeepLXTranslatePayload): Promise<string> {
+  const res = await fetch(`${BASE_URL}/translate/deeplx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: payload.url,
+      body: {
+        text: [payload.text],
+        source_lang: payload.sourceLang,
+        target_lang: payload.targetLang,
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new ApiError(text || `翻译失败 (${res.status})`, res.status)
+  }
+
+  const data = await res.json().catch(() => null)
+  if (typeof data === 'string') return data
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>
+    if (typeof obj.translatedText === 'string' && obj.translatedText.trim()) {
+      return obj.translatedText
+    }
+    if (Array.isArray(obj.translations) && obj.translations.length > 0) {
+      const first = obj.translations[0] as { text?: string }
+      if (typeof first?.text === 'string' && first.text.trim()) return first.text
+    }
+    if (Array.isArray(obj.data) && obj.data.length > 0) {
+      const first = obj.data[0] as { text?: string }
+      if (typeof first?.text === 'string' && first.text.trim()) return first.text
+    }
+    if (typeof obj.text === 'string' && obj.text.trim()) return obj.text
+    if (Array.isArray(obj.text) && obj.text.length > 0 && typeof obj.text[0] === 'string') {
+      return obj.text[0]
+    }
+  }
+
+  throw new ApiError('翻译接口返回格式异常', 502)
+}
+
 // ── 通用请求（带 Bearer + 401 自动刷新一次） ──────────
 
 interface ApiRequestOptions {

@@ -100,6 +100,12 @@ export interface ReaderSettings {
   oledCursorBrightness?: number
   /** 是否在「重新激活信息流」时自动刷新（5 分钟 TTL） */
   autoRefreshFeed?: boolean
+  /** DeepLX / 兼容接口地址 */
+  translationApiUrl?: string
+  /** 翻译源语言（auto=自动检测） */
+  translationSourceLang?: string
+  /** 翻译目标语言 */
+  translationTargetLang?: string
 }
 
 /** TXT 文件缓存 */
