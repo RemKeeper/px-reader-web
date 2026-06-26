@@ -452,6 +452,17 @@
           @click.stop
         >
           <div class="context-menu-section">
+            <span class="context-menu-label">全文转换</span>
+            <div class="flex gap-2">
+              <button class="ctx-action-btn ctx-action-btn--compact" @click="convertFullText('t2s')">
+                <span>转简体</span>
+              </button>
+              <button class="ctx-action-btn ctx-action-btn--compact" @click="convertFullText('s2t')">
+                <span>转繁体</span>
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-section">
             <span class="context-menu-label">字号</span>
             <div class="flex items-center gap-2">
               <van-button
@@ -520,6 +531,14 @@
               已选中: "{{ truncatedSelection }}"
             </span>
           </div>
+          <button class="ctx-action-btn" @click="convertSelection('t2s')">
+            <van-icon name="success" size="16" />
+            <span>转为简体</span>
+          </button>
+          <button class="ctx-action-btn" @click="convertSelection('s2t')">
+            <van-icon name="exchange" size="16" />
+            <span>转为繁体</span>
+          </button>
           <button class="ctx-action-btn" @click="openReplaceDialog">
             <van-icon name="exchange" size="16" />
             <span>替换</span>
@@ -571,6 +590,7 @@ import {
 } from '@/utils/novelMarkup'
 import { isRestrictedBrowser } from '@/utils/browser'
 import { ApiError, type TxtChapter, type LocalNovelMeta, type NovelMeta } from '@/types'
+import OpenCC from 'opencc-js'
 import NovelTags from '@/components/NovelTags.vue'
 import NovelStats from '@/components/NovelStats.vue'
 
@@ -617,6 +637,11 @@ const truncatedSelection = computed(() => {
   return s.length > 30 ? s.slice(0, 30) + '...' : s
 })
 
+const openccConverters = {
+  s2t: OpenCC.Converter({ from: 'cn', to: 'tw' }),
+  t2s: OpenCC.Converter({ from: 'tw', to: 'cn' }),
+}
+
 function onContextMenu(e: MouseEvent) {
   e.preventDefault()
   const sel = window.getSelection()
@@ -626,7 +651,7 @@ function onContextMenu(e: MouseEvent) {
 
   // 调整菜单位置，确保不超出视口
   const menuW = 220
-  const menuH = hasSelection.value ? 140 : 200
+  const menuH = hasSelection.value ? 220 : 240
   let x = e.clientX
   let y = e.clientY
   if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
@@ -648,6 +673,36 @@ function openReplaceDialog() {
   showReplaceDialog.value = true
   replaceInput.value = ''
   closeContextMenu()
+}
+
+async function convertSelection(mode: 't2s' | 's2t') {
+  const search = selectedText.value
+  if (!search) return
+
+  const converter = openccConverters[mode]
+  const converted = converter(search)
+  content.value = content.value.split(search).join(converted)
+  tokensCache.clear()
+
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  closeContextMenu()
+  showToast(mode === 't2s' ? '已转换为简体' : '已转换为繁体')
+}
+
+async function convertFullText(mode: 't2s' | 's2t') {
+  if (!content.value) return
+
+  const converter = openccConverters[mode]
+  content.value = converter(content.value)
+  tokensCache.clear()
+
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  closeContextMenu()
+  showToast(mode === 't2s' ? '全文已转换为简体' : '全文已转换为繁体')
 }
 
 async function onReplaceConfirm(action: 'confirm' | 'cancel') {
@@ -1231,6 +1286,17 @@ onMounted(async () => {
 
 .ctx-action-btn:hover {
   background: var(--color-bg);
+}
+
+.ctx-action-btn--compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 12px;
 }
 
 .ctx-action-btn--danger {
