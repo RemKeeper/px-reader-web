@@ -332,6 +332,19 @@ async function handleImage(url) {
   return new Response(upstream.body, { status: upstream.status, headers: respHeaders })
 }
 
+function normalizeUtf8Text(text) {
+  return new TextDecoder().decode(new TextEncoder().encode(text.normalize('NFC')))
+}
+
+function normalizeDeepLXBody(body) {
+  const input = body && typeof body === 'object' ? body : {}
+  const text = input.text
+  return {
+    ...input,
+    text: normalizeUtf8Text(Array.isArray(text) ? text.join('\n') : String(text || '')),
+  }
+}
+
 async function handleDeepLXTranslate(req) {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 })
 
@@ -362,7 +375,7 @@ async function handleDeepLXTranslate(req) {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
-    body: JSON.stringify(payload.body || {}),
+    body: JSON.stringify(normalizeDeepLXBody(payload.body)),
   })
 
   const headers = new Headers()

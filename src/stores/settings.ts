@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   translationApiUrl: '',
   translationSourceLang: 'auto',
   translationTargetLang: 'ZH',
+  translationGlossary: [],
 }
 
 export const useSettingsStore = defineStore(

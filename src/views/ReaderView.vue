@@ -489,6 +489,14 @@
               <button class="ctx-action-btn ctx-action-btn--compact" :disabled="translationLoading" @click="translateFullText">
                 <span>{{ translationLoading ? '翻译中…' : '开始翻译' }}</span>
               </button>
+              <button
+                v-if="originalContentSnapshot"
+                class="ctx-action-btn ctx-action-btn--compact"
+                :disabled="translationLoading"
+                @click="restoreOriginalContent"
+              >
+                <span>还原原文</span>
+              </button>
             </div>
           </div>
           <div class="context-menu-section">
@@ -568,6 +576,10 @@
             <van-icon name="exchange" size="16" />
             <span>转为繁体</span>
           </button>
+          <button class="ctx-action-btn" @click="openGlossaryDialog">
+            <van-icon name="records-o" size="16" />
+            <span>加入翻译术语库</span>
+          </button>
           <button class="ctx-action-btn" @click="openReplaceDialog">
             <van-icon name="exchange" size="16" />
             <span>替换</span>
@@ -596,6 +608,28 @@
           class="ctx-replace-input"
           placeholder="输入替换后的文本（留空即剔除）"
           @keyup.enter="onReplaceConfirm('confirm')"
+        />
+      </div>
+    </van-dialog>
+
+    <!-- 翻译术语库 -->
+    <van-dialog
+      v-model:show="showGlossaryDialog"
+      title="加入翻译术语库"
+      show-cancel-button
+      :before-close="onGlossaryConfirm"
+    >
+      <div class="p-4 space-y-3">
+        <input
+          v-model="glossarySourceInput"
+          class="ctx-replace-input"
+          placeholder="原文术语"
+        />
+        <input
+          v-model="glossaryTargetInput"
+          class="ctx-replace-input"
+          placeholder="对应译名"
+          @keyup.enter="onGlossaryConfirm('confirm')"
         />
       </div>
     </van-dialog>
@@ -660,11 +694,15 @@ const selectedText = ref('')
 const hasSelection = ref(false)
 const showReplaceDialog = ref(false)
 const replaceInput = ref('')
+const showGlossaryDialog = ref(false)
+const glossarySourceInput = ref('')
+const glossaryTargetInput = ref('')
 const showTranslationPanel = ref(false)
 const translationApiUrl = ref('')
 const translationSourceLang = ref('auto')
 const translationTargetLang = ref('ZH')
 const translationLoading = ref(false)
+const originalContentSnapshot = ref('')
 
 const truncatedSelection = computed(() => {
   const s = selectedText.value
@@ -674,6 +712,12 @@ const truncatedSelection = computed(() => {
 const openccConverters = {
   s2t: OpenCC.Converter({ from: 'cn', to: 'tw' }),
   t2s: OpenCC.Converter({ from: 'tw', to: 'cn' }),
+}
+
+interface GlossaryPlaceholder {
+  placeholder: string
+  source: string
+  target: string
 }
 
 function onContextMenu(e: MouseEvent) {
@@ -739,6 +783,36 @@ function openReplaceDialog() {
   closeContextMenu()
 }
 
+function openGlossaryDialog() {
+  glossarySourceInput.value = selectedText.value.trim()
+  glossaryTargetInput.value = ''
+  showGlossaryDialog.value = true
+  closeContextMenu()
+}
+
+function onGlossaryConfirm(action: 'confirm' | 'cancel') {
+  if (action === 'cancel') {
+    showGlossaryDialog.value = false
+    return true
+  }
+
+  const source = glossarySourceInput.value.trim()
+  const target = glossaryTargetInput.value.trim()
+  if (!source || !target) {
+    showToast('请填写原文术语和对应译名')
+    return false
+  }
+
+  const glossary = [...(settingsStore.settings.translationGlossary || [])]
+  const existing = glossary.find((item) => item.source === source)
+  if (existing) existing.target = target
+  else glossary.push({ source, target })
+  settingsStore.updateSettings({ translationGlossary: glossary })
+  showGlossaryDialog.value = false
+  showToast('已加入翻译术语库')
+  return true
+}
+
 async function convertSelection(mode: 't2s' | 's2t') {
   const search = selectedText.value
   if (!search) return
@@ -769,6 +843,75 @@ async function convertFullText(mode: 't2s' | 's2t') {
   showToast(mode === 't2s' ? '全文已转换为简体' : '全文已转换为繁体')
 }
 
+function splitTextIntoTranslationBatches(text: string, maxChars = 5000): string[] {
+  const lines = text.match(/.*(?:\r?\n|$)/g)?.filter((line) => line.length > 0) || []
+  const batches: string[] = []
+  let current = ''
+
+  for (const line of lines) {
+    if (!line.trim()) {
+      current += line
+      continue
+    }
+
+    if (current && current.length + line.length > maxChars) {
+      batches.push(current)
+      current = ''
+    }
+
+    if (line.length > maxChars) {
+      batches.push(line)
+      continue
+    }
+
+    current += line
+  }
+
+  if (current) batches.push(current)
+  return batches
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function applyGlossaryPlaceholders(text: string): { text: string; placeholders: GlossaryPlaceholder[] } {
+  const glossary = [...(settingsStore.settings.translationGlossary || [])]
+    .filter((item) => item.source.trim() && item.target.trim())
+    .sort((a, b) => b.source.length - a.source.length)
+  let result = text
+  const placeholders: GlossaryPlaceholder[] = []
+
+  for (const [index, item] of glossary.entries()) {
+    if (!result.includes(item.source)) continue
+    const placeholder = `PXTERM${index.toString().padStart(4, '0')}`
+    result = result.replace(new RegExp(escapeRegExp(item.source), 'g'), placeholder)
+    placeholders.push({ placeholder, source: item.source, target: item.target })
+  }
+
+  return { text: result, placeholders }
+}
+
+function restoreGlossaryPlaceholders(text: string, placeholders: GlossaryPlaceholder[]): string {
+  let result = text
+  for (const item of placeholders) {
+    result = result.replace(new RegExp(escapeRegExp(item.placeholder), 'g'), item.target)
+  }
+  return result
+}
+
+async function restoreOriginalContent() {
+  if (!originalContentSnapshot.value) return
+
+  content.value = originalContentSnapshot.value
+  tokensCache.clear()
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  closeContextMenu()
+  showToast('已还原原文')
+}
+
 async function translateFullText() {
   if (!content.value) return
   const url = translationApiUrl.value.trim()
@@ -780,13 +923,26 @@ async function translateFullText() {
   saveTranslationSettings()
   translationLoading.value = true
   try {
-    const translated = await translateWithDeepLX({
-      url,
-      text: content.value,
-      sourceLang: translationSourceLang.value,
-      targetLang: translationTargetLang.value,
-    })
-    content.value = translated
+    if (!originalContentSnapshot.value) {
+      originalContentSnapshot.value = content.value
+    }
+    const protectedContent = applyGlossaryPlaceholders(content.value)
+    const batches = splitTextIntoTranslationBatches(protectedContent.text)
+    const translatedBatches = await Promise.all(
+      batches.map((batch) => {
+        if (!batch.trim()) return Promise.resolve(batch)
+        return translateWithDeepLX({
+          url,
+          text: batch,
+          sourceLang: translationSourceLang.value,
+          targetLang: translationTargetLang.value,
+        })
+      }),
+    )
+    content.value = restoreGlossaryPlaceholders(
+      translatedBatches.join(''),
+      protectedContent.placeholders,
+    )
     tokensCache.clear()
     const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
     chapters.value = result.chapters

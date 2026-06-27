@@ -169,6 +169,10 @@ export interface DeepLXTranslatePayload {
   targetLang: string
 }
 
+function normalizeUtf8Text(text: string): string {
+  return new TextDecoder().decode(new TextEncoder().encode(text.normalize('NFC')))
+}
+
 export async function translateWithDeepLX(payload: DeepLXTranslatePayload): Promise<string> {
   const res = await fetch(`${BASE_URL}/translate/deeplx`, {
     method: 'POST',
@@ -176,7 +180,7 @@ export async function translateWithDeepLX(payload: DeepLXTranslatePayload): Prom
     body: JSON.stringify({
       url: payload.url,
       body: {
-        text: [payload.text],
+        text: normalizeUtf8Text(payload.text),
         source_lang: payload.sourceLang,
         target_lang: payload.targetLang,
       },
@@ -199,6 +203,7 @@ export async function translateWithDeepLX(payload: DeepLXTranslatePayload): Prom
       const first = obj.translations[0] as { text?: string }
       if (typeof first?.text === 'string' && first.text.trim()) return first.text
     }
+    if (typeof obj.data === 'string' && obj.data.trim()) return obj.data
     if (Array.isArray(obj.data) && obj.data.length > 0) {
       const first = obj.data[0] as { text?: string }
       if (typeof first?.text === 'string' && first.text.trim()) return first.text

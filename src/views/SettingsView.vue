@@ -113,6 +113,12 @@
           </van-cell>
           <van-cell title="默认源语言" :value="translationSourceLabel" is-link @click="showTranslationSourcePicker = true" />
           <van-cell title="默认目标语言" :value="translationTargetLabel" is-link @click="showTranslationTargetPicker = true" />
+          <van-cell
+            title="术语管理"
+            :value="`${translationGlossary.length} 条`"
+            is-link
+            @click="openGlossaryManager"
+          />
         </van-cell-group>
       </div>
 
@@ -448,6 +454,50 @@
       </div>
     </van-popup>
 
+    <!-- 术语管理 -->
+    <van-popup
+      v-model:show="showGlossaryManager"
+      teleport="body"
+      round
+      closeable
+      class="center-modal center-modal--scroll-aware"
+      :style="{ width: '92vw', maxWidth: '640px', top: popupViewportTop }"
+    >
+      <div class="center-modal__header">术语管理</div>
+      <div class="p-4 pt-2 space-y-3 center-modal__content">
+        <div v-if="glossaryDraft.length === 0" class="text-sm text-text-secondary text-center py-6">
+          暂无术语
+        </div>
+        <div
+          v-for="(item, index) in glossaryDraft"
+          :key="index"
+          class="space-y-2 rounded-lg border border-border p-3"
+        >
+          <van-field
+            v-model="item.source"
+            label="原文"
+            placeholder="原文术语"
+            autosize
+          />
+          <van-field
+            v-model="item.target"
+            label="译名"
+            placeholder="对应译名"
+            autosize
+          />
+          <div class="flex justify-end">
+            <van-button size="small" plain type="danger" @click="removeGlossaryDraft(index)">
+              删除
+            </van-button>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <van-button block plain @click="addGlossaryDraft">新增术语</van-button>
+          <van-button block type="primary" @click="saveGlossaryManager">保存</van-button>
+        </div>
+      </div>
+    </van-popup>
+
     <!-- 手动填写 refresh_token -->
     <van-popup
       v-model:show="showManualLogin"
@@ -515,9 +565,11 @@ const showThemePicker = ref(false)
 const showTranslationConfig = ref(false)
 const showTranslationSourcePicker = ref(false)
 const showTranslationTargetPicker = ref(false)
+const showGlossaryManager = ref(false)
 const showManualLogin = ref(false)
 const manualToken = ref('')
 const translationApiUrlInput = ref('')
+const glossaryDraft = ref<Array<{ source: string; target: string }>>([])
 const popupViewportTop = ref('50%')
 const settingsScrollRef = ref<HTMLElement | null>(null)
 
@@ -552,7 +604,7 @@ function unbindPopupPositionEvents() {
 }
 
 watch(
-  () => [showFontPicker.value, showThemePicker.value, showTranslationConfig.value, showTranslationSourcePicker.value, showTranslationTargetPicker.value, showManualLogin.value],
+  () => [showFontPicker.value, showThemePicker.value, showTranslationConfig.value, showTranslationSourcePicker.value, showTranslationTargetPicker.value, showGlossaryManager.value, showManualLogin.value],
   (flags) => {
     const visible = flags.some(Boolean)
     if (visible) {
@@ -631,6 +683,8 @@ const translationTargetLabel = computed(() => {
   return opt?.label || '中文'
 })
 
+const translationGlossary = computed(() => settings.value.translationGlossary || [])
+
 const themeLabel = computed(() => {
   const t = themeOptions.find((o) => o.value === settings.value.theme)
   return t?.label || '深色模式'
@@ -642,6 +696,28 @@ function saveTranslationConfig() {
   })
   showTranslationConfig.value = false
   showToast('翻译配置已保存')
+}
+
+function openGlossaryManager() {
+  glossaryDraft.value = translationGlossary.value.map((item) => ({ ...item }))
+  showGlossaryManager.value = true
+}
+
+function addGlossaryDraft() {
+  glossaryDraft.value.push({ source: '', target: '' })
+}
+
+function removeGlossaryDraft(index: number) {
+  glossaryDraft.value.splice(index, 1)
+}
+
+function saveGlossaryManager() {
+  const glossary = glossaryDraft.value
+    .map((item) => ({ source: item.source.trim(), target: item.target.trim() }))
+    .filter((item) => item.source && item.target)
+  settingsStore.updateSettings({ translationGlossary: glossary })
+  showGlossaryManager.value = false
+  showToast(`已保存 ${glossary.length} 条术语`)
 }
 
 function adjustFontSize(delta: number) {

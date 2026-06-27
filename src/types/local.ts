@@ -106,6 +106,8 @@ export interface ReaderSettings {
   translationSourceLang?: string
   /** 翻译目标语言 */
   translationTargetLang?: string
+  /** 翻译术语库：source 为原文术语，target 为期望译名 */
+  translationGlossary?: Array<{ source: string; target: string }>
 }
 
 /** TXT 文件缓存 */
