@@ -9,6 +9,7 @@
  *   POST  /oauth/auth/token        → https://oauth.secure.pixiv.net/auth/token
  *   *     /app/<path>              → https://app-api.pixiv.net/<path>
  *   GET   /image?url=<encoded>     → 透传 i.pximg.net 图片（注入 Referer）
+ *   POST  /translate/deeplx        → DeepLX 兼容接口转发
  *   *     /                        → 健康检查
  *
  * 服务端备用 Token（免登录分享）：
@@ -331,6 +332,58 @@ async function handleImage(url) {
   return new Response(upstream.body, { status: upstream.status, headers: respHeaders })
 }
 
+function normalizeUtf8Text(text) {
+  return new TextDecoder().decode(new TextEncoder().encode(text.normalize('NFC')))
+}
+
+function normalizeDeepLXBody(body) {
+  const input = body && typeof body === 'object' ? body : {}
+  const text = input.text
+  return {
+    ...input,
+    text: normalizeUtf8Text(Array.isArray(text) ? text.join('\n') : String(text || '')),
+  }
+}
+
+async function handleDeepLXTranslate(req) {
+  if (req.method !== 'POST') return new Response('method not allowed', { status: 405 })
+
+  let payload
+  try {
+    payload = await req.json()
+  } catch {
+    return new Response('invalid json body', { status: 400 })
+  }
+
+  if (typeof payload.url !== 'string' || !payload.url.trim()) {
+    return new Response('missing url', { status: 400 })
+  }
+
+  let target
+  try {
+    target = new URL(payload.url)
+  } catch {
+    return new Response('invalid url', { status: 400 })
+  }
+  if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+    return new Response('unsupported url protocol', { status: 400 })
+  }
+
+  const upstream = await fetch(target.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(normalizeDeepLXBody(payload.body)),
+  })
+
+  const headers = new Headers()
+  const ct = upstream.headers.get('Content-Type')
+  headers.set('Content-Type', ct || 'application/json')
+  return new Response(upstream.body, { status: upstream.status, headers })
+}
+
 export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') {
@@ -352,6 +405,8 @@ export default {
         }
       } else if (url.pathname === '/image') {
         resp = await handleImage(url)
+      } else if (url.pathname === '/translate/deeplx') {
+        resp = await handleDeepLXTranslate(req)
       } else if (url.pathname === '/' || url.pathname === '') {
         resp = new Response('px-reader proxy ok', { status: 200 })
       } else {

@@ -452,6 +452,54 @@
           @click.stop
         >
           <div class="context-menu-section">
+            <span class="context-menu-label">全文转换</span>
+            <div class="flex gap-2">
+              <button class="ctx-action-btn ctx-action-btn--compact" @click="convertFullText('t2s')">
+                <span>转简体</span>
+              </button>
+              <button class="ctx-action-btn ctx-action-btn--compact" @click="convertFullText('s2t')">
+                <span>转繁体</span>
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-section">
+            <span class="context-menu-label">翻译全文</span>
+            <button class="ctx-action-btn ctx-action-btn--compact" @click="toggleTranslationPanel">
+              <van-icon name="comment-o" size="14" />
+              <span>{{ showTranslationPanel ? '收起设置' : '翻译设置' }}</span>
+            </button>
+            <div v-if="showTranslationPanel" class="mt-2 space-y-2">
+              <input
+                v-model="translationApiUrl"
+                class="ctx-replace-input"
+                placeholder="https://your-deeplx/translate"
+              />
+              <div class="flex gap-2">
+                <select v-model="translationSourceLang" class="ctx-select">
+                  <option v-for="opt in translationLanguageOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <select v-model="translationTargetLang" class="ctx-select">
+                  <option v-for="opt in translationLanguageOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <button class="ctx-action-btn ctx-action-btn--compact" :disabled="translationLoading" @click="translateFullText">
+                <span>{{ translationLoading ? '翻译中…' : '开始翻译' }}</span>
+              </button>
+              <button
+                v-if="originalContentSnapshot"
+                class="ctx-action-btn ctx-action-btn--compact"
+                :disabled="translationLoading"
+                @click="restoreOriginalContent"
+              >
+                <span>还原原文</span>
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-section">
             <span class="context-menu-label">字号</span>
             <div class="flex items-center gap-2">
               <van-button
@@ -520,6 +568,18 @@
               已选中: "{{ truncatedSelection }}"
             </span>
           </div>
+          <button class="ctx-action-btn" @click="convertSelection('t2s')">
+            <van-icon name="success" size="16" />
+            <span>转为简体</span>
+          </button>
+          <button class="ctx-action-btn" @click="convertSelection('s2t')">
+            <van-icon name="exchange" size="16" />
+            <span>转为繁体</span>
+          </button>
+          <button class="ctx-action-btn" @click="openGlossaryDialog">
+            <van-icon name="records-o" size="16" />
+            <span>加入翻译术语库</span>
+          </button>
           <button class="ctx-action-btn" @click="openReplaceDialog">
             <van-icon name="exchange" size="16" />
             <span>替换</span>
@@ -551,6 +611,28 @@
         />
       </div>
     </van-dialog>
+
+    <!-- 翻译术语库 -->
+    <van-dialog
+      v-model:show="showGlossaryDialog"
+      title="加入翻译术语库"
+      show-cancel-button
+      :before-close="onGlossaryConfirm"
+    >
+      <div class="p-4 space-y-3">
+        <input
+          v-model="glossarySourceInput"
+          class="ctx-replace-input"
+          placeholder="原文术语"
+        />
+        <input
+          v-model="glossaryTargetInput"
+          class="ctx-replace-input"
+          placeholder="对应译名"
+          @keyup.enter="onGlossaryConfirm('confirm')"
+        />
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -561,7 +643,7 @@ import { showToast } from 'vant'
 import { useNovelStore, useSettingsStore, useShelfStore, useAuthStore } from '@/stores'
 import { splitChaptersInWorker } from '@/workers'
 import { getTxtCache } from '@/db'
-import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail } from '@/api'
+import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail, translateWithDeepLX } from '@/api'
 import { usePageTitle } from '@/composables'
 import {
   parseNovelMarkup,
@@ -571,6 +653,7 @@ import {
 } from '@/utils/novelMarkup'
 import { isRestrictedBrowser } from '@/utils/browser'
 import { ApiError, type TxtChapter, type LocalNovelMeta, type NovelMeta } from '@/types'
+import OpenCC from 'opencc-js'
 import NovelTags from '@/components/NovelTags.vue'
 import NovelStats from '@/components/NovelStats.vue'
 
@@ -611,11 +694,31 @@ const selectedText = ref('')
 const hasSelection = ref(false)
 const showReplaceDialog = ref(false)
 const replaceInput = ref('')
+const showGlossaryDialog = ref(false)
+const glossarySourceInput = ref('')
+const glossaryTargetInput = ref('')
+const showTranslationPanel = ref(false)
+const translationApiUrl = ref('')
+const translationSourceLang = ref('auto')
+const translationTargetLang = ref('ZH')
+const translationLoading = ref(false)
+const originalContentSnapshot = ref('')
 
 const truncatedSelection = computed(() => {
   const s = selectedText.value
   return s.length > 30 ? s.slice(0, 30) + '...' : s
 })
+
+const openccConverters = {
+  s2t: OpenCC.Converter({ from: 'cn', to: 'tw' }),
+  t2s: OpenCC.Converter({ from: 'tw', to: 'cn' }),
+}
+
+interface GlossaryPlaceholder {
+  placeholder: string
+  source: string
+  target: string
+}
 
 function onContextMenu(e: MouseEvent) {
   e.preventDefault()
@@ -626,7 +729,7 @@ function onContextMenu(e: MouseEvent) {
 
   // 调整菜单位置，确保不超出视口
   const menuW = 220
-  const menuH = hasSelection.value ? 140 : 200
+  const menuH = hasSelection.value ? 220 : 240
   let x = e.clientX
   let y = e.clientY
   if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
@@ -639,6 +742,36 @@ function closeContextMenu() {
   showContextMenu.value = false
 }
 
+function inferBrowserTargetLanguage(): string {
+  const lang = (navigator.language || 'en-US').toLowerCase()
+  if (lang.startsWith('zh')) return 'ZH'
+  if (lang.startsWith('ja')) return 'JA'
+  if (lang.startsWith('ko')) return 'KO'
+  if (lang.startsWith('fr')) return 'FR'
+  if (lang.startsWith('de')) return 'DE'
+  if (lang.startsWith('es')) return 'ES'
+  if (lang.startsWith('it')) return 'IT'
+  if (lang.startsWith('pt')) return 'PT'
+  if (lang.startsWith('ru')) return 'RU'
+  return 'EN'
+}
+
+function saveTranslationSettings() {
+  settingsStore.updateSettings({
+    translationApiUrl: translationApiUrl.value.trim(),
+    translationSourceLang: translationSourceLang.value,
+    translationTargetLang: translationTargetLang.value,
+  })
+}
+
+function toggleTranslationPanel() {
+  showTranslationPanel.value = !showTranslationPanel.value
+  if (!showTranslationPanel.value) return
+  translationApiUrl.value = settingsStore.settings.translationApiUrl || translationApiUrl.value
+  translationSourceLang.value = settingsStore.settings.translationSourceLang || 'auto'
+  translationTargetLang.value = settingsStore.settings.translationTargetLang || inferBrowserTargetLanguage()
+}
+
 function adjustFontSize(delta: number) {
   const fs = settingsStore.settings.fontSize + delta
   settingsStore.updateSettings({ fontSize: Math.max(12, Math.min(32, fs)) })
@@ -648,6 +781,179 @@ function openReplaceDialog() {
   showReplaceDialog.value = true
   replaceInput.value = ''
   closeContextMenu()
+}
+
+function openGlossaryDialog() {
+  glossarySourceInput.value = selectedText.value.trim()
+  glossaryTargetInput.value = ''
+  showGlossaryDialog.value = true
+  closeContextMenu()
+}
+
+function onGlossaryConfirm(action: 'confirm' | 'cancel') {
+  if (action === 'cancel') {
+    showGlossaryDialog.value = false
+    return true
+  }
+
+  const source = glossarySourceInput.value.trim()
+  const target = glossaryTargetInput.value.trim()
+  if (!source || !target) {
+    showToast('请填写原文术语和对应译名')
+    return false
+  }
+
+  const glossary = [...(settingsStore.settings.translationGlossary || [])]
+  const existing = glossary.find((item) => item.source === source)
+  if (existing) existing.target = target
+  else glossary.push({ source, target })
+  settingsStore.updateSettings({ translationGlossary: glossary })
+  showGlossaryDialog.value = false
+  showToast('已加入翻译术语库')
+  return true
+}
+
+async function convertSelection(mode: 't2s' | 's2t') {
+  const search = selectedText.value
+  if (!search) return
+
+  const converter = openccConverters[mode]
+  const converted = converter(search)
+  content.value = content.value.split(search).join(converted)
+  tokensCache.clear()
+
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  closeContextMenu()
+  showToast(mode === 't2s' ? '已转换为简体' : '已转换为繁体')
+}
+
+async function convertFullText(mode: 't2s' | 's2t') {
+  if (!content.value) return
+
+  const converter = openccConverters[mode]
+  content.value = converter(content.value)
+  tokensCache.clear()
+
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  closeContextMenu()
+  showToast(mode === 't2s' ? '全文已转换为简体' : '全文已转换为繁体')
+}
+
+function splitTextIntoTranslationBatches(text: string, maxChars = 5000): string[] {
+  const lines = text.match(/.*(?:\r?\n|$)/g)?.filter((line) => line.length > 0) || []
+  const batches: string[] = []
+  let current = ''
+
+  for (const line of lines) {
+    if (!line.trim()) {
+      current += line
+      continue
+    }
+
+    if (current && current.length + line.length > maxChars) {
+      batches.push(current)
+      current = ''
+    }
+
+    if (line.length > maxChars) {
+      batches.push(line)
+      continue
+    }
+
+    current += line
+  }
+
+  if (current) batches.push(current)
+  return batches
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function applyGlossaryPlaceholders(text: string): { text: string; placeholders: GlossaryPlaceholder[] } {
+  const glossary = [...(settingsStore.settings.translationGlossary || [])]
+    .filter((item) => item.source.trim() && item.target.trim())
+    .sort((a, b) => b.source.length - a.source.length)
+  let result = text
+  const placeholders: GlossaryPlaceholder[] = []
+
+  for (const [index, item] of glossary.entries()) {
+    if (!result.includes(item.source)) continue
+    const placeholder = `PXTERM${index.toString().padStart(4, '0')}`
+    result = result.replace(new RegExp(escapeRegExp(item.source), 'g'), placeholder)
+    placeholders.push({ placeholder, source: item.source, target: item.target })
+  }
+
+  return { text: result, placeholders }
+}
+
+function restoreGlossaryPlaceholders(text: string, placeholders: GlossaryPlaceholder[]): string {
+  let result = text
+  for (const item of placeholders) {
+    result = result.replace(new RegExp(escapeRegExp(item.placeholder), 'g'), item.target)
+  }
+  return result
+}
+
+async function restoreOriginalContent() {
+  if (!originalContentSnapshot.value) return
+
+  content.value = originalContentSnapshot.value
+  tokensCache.clear()
+  const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+  chapters.value = result.chapters
+  hasNaturalChapters.value = result.hasNaturalSplits
+  closeContextMenu()
+  showToast('已还原原文')
+}
+
+async function translateFullText() {
+  if (!content.value) return
+  const url = translationApiUrl.value.trim()
+  if (!url) {
+    showToast('请先填写 DeepLX 兼容接口地址')
+    return
+  }
+
+  saveTranslationSettings()
+  translationLoading.value = true
+  try {
+    if (!originalContentSnapshot.value) {
+      originalContentSnapshot.value = content.value
+    }
+    const protectedContent = applyGlossaryPlaceholders(content.value)
+    const batches = splitTextIntoTranslationBatches(protectedContent.text)
+    const translatedBatches = await Promise.all(
+      batches.map((batch) => {
+        if (!batch.trim()) return Promise.resolve(batch)
+        return translateWithDeepLX({
+          url,
+          text: batch,
+          sourceLang: translationSourceLang.value,
+          targetLang: translationTargetLang.value,
+        })
+      }),
+    )
+    content.value = restoreGlossaryPlaceholders(
+      translatedBatches.join(''),
+      protectedContent.placeholders,
+    )
+    tokensCache.clear()
+    const result = await splitChaptersInWorker(content.value, settingsStore.settings.chapterMaxChars)
+    chapters.value = result.chapters
+    hasNaturalChapters.value = result.hasNaturalSplits
+    closeContextMenu()
+    showToast('全文翻译已完成')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '翻译失败')
+  } finally {
+    translationLoading.value = false
+  }
 }
 
 async function onReplaceConfirm(action: 'confirm' | 'cancel') {
@@ -714,6 +1020,21 @@ const fontOptions = [
   { label: '黑体', value: 'sans' },
   { label: '宋体', value: 'serif' },
   { label: '等宽', value: 'mono' },
+]
+
+const translationLanguageOptions = [
+  { label: '自动检测', value: 'auto' },
+  { label: '简体中文', value: 'ZH' },
+  { label: '繁體中文', value: 'ZH-HANT' },
+  { label: 'English', value: 'EN' },
+  { label: '日本語', value: 'JA' },
+  { label: '한국어', value: 'KO' },
+  { label: 'Français', value: 'FR' },
+  { label: 'Deutsch', value: 'DE' },
+  { label: 'Español', value: 'ES' },
+  { label: 'Italiano', value: 'IT' },
+  { label: 'Português', value: 'PT' },
+  { label: 'Русский', value: 'RU' },
 ]
 
 const themeOptions = [
@@ -1030,6 +1351,10 @@ function saveCurrentProgress() {
   }
 }
 
+watch([translationApiUrl, translationSourceLang, translationTargetLang], () => {
+  saveTranslationSettings()
+}, { flush: 'sync' })
+
 onMounted(async () => {
   const novelId = props.id
 
@@ -1068,6 +1393,10 @@ onMounted(async () => {
     }
     loading.value = false
   }
+
+  translationApiUrl.value = settingsStore.settings.translationApiUrl || translationApiUrl.value
+  translationSourceLang.value = settingsStore.settings.translationSourceLang || 'auto'
+  translationTargetLang.value = settingsStore.settings.translationTargetLang || inferBrowserTargetLanguage()
 
   // 将小说记录到独立的阅读历史中（不影响书架）
   {
@@ -1231,6 +1560,28 @@ onMounted(async () => {
 
 .ctx-action-btn:hover {
   background: var(--color-bg);
+}
+
+.ctx-action-btn--compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+.ctx-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 12px;
 }
 
 .ctx-action-btn--danger {

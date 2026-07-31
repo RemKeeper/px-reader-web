@@ -19,6 +19,10 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   oledCursorBrightnessEnabled: false,
   oledCursorBrightness: 80,
   autoRefreshFeed: true,
+  translationApiUrl: '',
+  translationSourceLang: 'auto',
+  translationTargetLang: 'ZH',
+  translationGlossary: [],
 }
 
 export const useSettingsStore = defineStore(
