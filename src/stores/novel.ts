@@ -1,16 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { ApiError, type NovelMeta, type NovelTextResponse, type BookmarkTag } from '@/types'
+import {
+  ApiError,
+  type NovelMeta,
+  type NovelTextResponse,
+  type BookmarkTag,
+  type NovelSeriesDetail,
+  type PixivUser,
+} from '@/types'
 import {
   getRecommendedNovels,
   getFollowNovels,
   getUserNovels,
   getNovelText,
+  getNovelSeries,
   searchNovels,
+  searchPopularPreviewNovels,
   getBookmarkedNovels,
   getBookmarkTags,
 } from '@/api'
 import { isRestrictedBrowser, getRestrictedBrowserName } from '@/utils/browser'
+import { isPremiumUser } from '@/utils/token'
 import { useAuthStore } from './auth'
 
 export const useNovelStore = defineStore('novel', () => {
@@ -37,6 +47,90 @@ export const useNovelStore = defineStore('novel', () => {
 
   function cacheNovelMetas(list: NovelMeta[]) {
     cacheMetas(list)
+  }
+
+  // ── 子页面缓存（系列 / 用户 / 正文）───────────────
+
+  /** 子页面数据缓存 TTL：5 分钟 */
+  const SUB_CACHE_TTL = 5 * 60 * 1000
+
+  function isCacheFresh(cachedAt: number): boolean {
+    return cachedAt > 0 && Date.now() - cachedAt < SUB_CACHE_TTL
+  }
+
+  /** 系列页缓存（按 series_id） */
+  interface SeriesCacheEntry {
+    detail: NovelSeriesDetail
+    novels: NovelMeta[]
+    nextUrl: string | null
+    cachedAt: number
+  }
+  const seriesCache = ref<Record<string, SeriesCacheEntry>>({})
+
+  /** 用户页缓存（按 user_id） */
+  interface UserPageCacheEntry {
+    user: PixivUser
+    novels: NovelMeta[]
+    nextUrl: string | null
+    cachedAt: number
+  }
+  const userCache = ref<Record<string, UserPageCacheEntry>>({})
+
+  /** 正文内存缓存（按 novel_id，与 IndexedDB 缓存互补） */
+  interface TextCacheEntry {
+    text: string
+    cachedAt: number
+  }
+  const textCache = ref<Record<string, TextCacheEntry>>({})
+
+  /** 读取新鲜（TTL 内）的系列页缓存，无则返回 undefined */
+  function getCachedSeries(seriesId: string | number): SeriesCacheEntry | undefined {
+    const entry = seriesCache.value[String(seriesId)]
+    return entry && isCacheFresh(entry.cachedAt) ? entry : undefined
+  }
+
+  /** 加载系列页（首次或加载更多），并写入缓存；失败返回 null */
+  async function loadSeries(
+    seriesId: string | number,
+    options: { nextUrl?: string | null } = {},
+  ): Promise<SeriesCacheEntry | null> {
+    const key = String(seriesId)
+    const prev = seriesCache.value[key]
+    error.value = null
+    try {
+      const res = await getNovelSeries({
+        series_id: key,
+        ...(options.nextUrl ? { next_url: options.nextUrl } : {}),
+      })
+      const entry: SeriesCacheEntry = {
+        detail: res.novel_series_detail,
+        novels: options.nextUrl && prev ? [...prev.novels, ...(res.novels || [])] : (res.novels || []),
+        nextUrl: res.next_url,
+        cachedAt: Date.now(),
+      }
+      seriesCache.value = { ...seriesCache.value, [key]: entry }
+      cacheMetas(res.novels || [])
+      return entry
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        useAuthStore().handle401()
+      }
+      error.value = e instanceof Error ? e.message : '加载系列失败'
+      return null
+    }
+  }
+
+  /** 读取新鲜（TTL 内）的用户页缓存，无则返回 undefined */
+  function getCachedUserPage(userId: string | number): UserPageCacheEntry | undefined {
+    const entry = userCache.value[String(userId)]
+    return entry && isCacheFresh(entry.cachedAt) ? entry : undefined
+  }
+
+  /** 清空子页面缓存（登出 / 401 时调用，避免不同账号间串数据） */
+  function clearSubCaches() {
+    seriesCache.value = {}
+    userCache.value = {}
+    textCache.value = {}
   }
 
   /** 关注列表 */
@@ -124,6 +218,18 @@ export const useNovelStore = defineStore('novel', () => {
     try {
       const res = await getUserNovels({ user_id: userId, offset })
       cacheMetas(res.novels)
+      // 写入用户页缓存（加载更多时合并到已有列表）
+      const key = String(userId)
+      const prev = userCache.value[key]
+      userCache.value = {
+        ...userCache.value,
+        [key]: {
+          user: res.user,
+          novels: offset && prev ? [...prev.novels, ...res.novels] : res.novels,
+          nextUrl: res.next_url,
+          cachedAt: Date.now(),
+        },
+      }
       return res
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -140,6 +246,33 @@ export const useNovelStore = defineStore('novel', () => {
   const searchNextUrl = ref<string | null>(null)
   const searchLoading = ref(false)
   const searchKeyword = ref('')
+  /** 搜索排序方式: date_desc | date_asc | popular_desc | popular_preview | trending_builtin */
+  const searchSort = ref<string>('date_desc')
+  /** 搜索目标: partial_match_for_tags | exact_match_for_tags | title_and_caption | keyword | text */
+  const searchTarget = ref<string>('partial_match_for_tags')
+  /** 发布起始日期 YYYY-MM-DD（可选） */
+  const searchStartDate = ref('')
+  /** 发布结束日期 YYYY-MM-DD（可选） */
+  const searchEndDate = ref('')
+  /** 最少收藏数（可选，会员场景下生效） */
+  const searchBookmarkMin = ref<number | null>(null)
+  /**
+   * 收藏数快捷桶（starSize）：如 '1000' 表示追加 "1000users入り" 到关键字。
+   * 利用 pixiv 自动桶标签，对非会员同样生效（与 bookmark_num_min 是两条并存路径）。
+   * 空字符串表示不启用。
+   */
+  const searchStarSize = ref('')
+  /**
+   * 当前搜索模式：
+   * - normal：常规搜索端点 /v1/search/novel（会员可翻页热度，非会员常规排序也可翻页）
+   * - preview：非会员热度预览端点 /v1/search/popular-preview/novel（单页，不可翻页）
+   */
+  const searchMode = ref<'normal' | 'preview'>('normal')
+
+  /** 是否为"热度类"排序（这些排序在非会员下会被降级到预览端点） */
+  function isPopularSort(sort: string): boolean {
+    return sort === 'popular_desc' || sort === 'popular_preview' || sort === 'trending_builtin'
+  }
 
   async function loadSearch(word: string, reset = false) {
     if (searchLoading.value) return
@@ -152,12 +285,41 @@ export const useNovelStore = defineStore('novel', () => {
         searchKeyword.value = word
       }
       const offset = extractOffset(searchNextUrl.value)
-      const res = await searchNovels({
-        word,
-        ...(offset ? { offset } : {}),
-      })
+      const sort = searchSort.value
+      const premium = isPremiumUser()
+      // 非会员选择热度排序 → 降级到 popular-preview（单页、不带 sort 参数）
+      const usePreview = isPopularSort(sort) && !premium
+      searchMode.value = usePreview ? 'preview' : 'normal'
+
+      const startDate = searchStartDate.value || undefined
+      const endDate = searchEndDate.value || undefined
+      // 收藏数快捷桶：把 starSize 拼成关键字后缀（如 "恋愛 1000users入り"）
+      const starSuffix = searchStarSize.value ? `${searchStarSize.value}users入り` : ''
+      const apiWord = starSuffix ? `${word} ${starSuffix}` : word
+
+      let res: Awaited<ReturnType<typeof searchNovels>>
+      if (usePreview) {
+        res = await searchPopularPreviewNovels({
+          word: apiWord,
+          search_target: searchTarget.value,
+          start_date: startDate,
+          end_date: endDate,
+        })
+        // 预览端点单页返回，无翻页
+        searchNextUrl.value = null
+      } else {
+        res = await searchNovels({
+          word: apiWord,
+          sort,
+          search_target: searchTarget.value,
+          ...(offset ? { offset } : {}),
+          start_date: startDate,
+          end_date: endDate,
+          ...(searchBookmarkMin.value !== null ? { bookmark_num_min: searchBookmarkMin.value } : {}),
+        })
+        searchNextUrl.value = res.next_url
+      }
       search.value = reset ? res.novels : [...search.value, ...res.novels]
-      searchNextUrl.value = res.next_url
       cacheMetas(res.novels)
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -248,6 +410,13 @@ export const useNovelStore = defineStore('novel', () => {
   // ── 小说正文 ──────────────────────────────────────
 
   async function loadNovelText(id: string | number): Promise<string | null> {
+    const key = String(id)
+    // 命中内存缓存（TTL 内）直接返回，避免重复请求正文
+    const hit = textCache.value[key]
+    if (hit && isCacheFresh(hit.cachedAt)) {
+      currentText.value = hit.text
+      return hit.text
+    }
     currentTextLoading.value = true
     error.value = null
     try {
@@ -275,6 +444,8 @@ export const useNovelStore = defineStore('novel', () => {
       currentImages.value = res.images
       currentSeriesPrev.value = res.series_prev || {}
       currentSeriesNext.value = res.series_next || {}
+      // 写入内存缓存，加速再次打开
+      textCache.value = { ...textCache.value, [key]: { text: res.novel_text, cachedAt: Date.now() } }
       return res.novel_text
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -302,6 +473,13 @@ export const useNovelStore = defineStore('novel', () => {
     searchNextUrl,
     searchLoading,
     searchKeyword,
+    searchSort,
+    searchTarget,
+    searchStartDate,
+    searchEndDate,
+    searchBookmarkMin,
+    searchStarSize,
+    searchMode,
     currentText,
     currentIllusts,
     currentImages,
@@ -312,6 +490,10 @@ export const useNovelStore = defineStore('novel', () => {
     loadRecommended,
     loadFollow,
     loadUserNovels,
+    getCachedUserPage,
+    getCachedSeries,
+    loadSeries,
+    clearSubCaches,
     bookmarks,
     bookmarksNextUrl,
     bookmarksLoading,

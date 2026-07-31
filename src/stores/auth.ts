@@ -9,6 +9,8 @@ import {
   logout as clearLocalAuth,
 } from '@/api'
 
+import { useNovelStore } from './novel'
+
 export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = ref(hasTokens())
   const loading = ref(false)
@@ -112,12 +114,15 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     clearLocalAuth()
     isLoggedIn.value = false
+    // 清空子页面缓存，避免不同账号间串数据
+    useNovelStore().clearSubCaches()
   }
 
   /** 业务侧 401 兜底 */
   function handle401() {
     clearLocalAuth()
     isLoggedIn.value = false
+    useNovelStore().clearSubCaches()
   }
 
   /** 手动登录兜底：用户填入 refresh_token 后验证并保存 */

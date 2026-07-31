@@ -10,6 +10,7 @@ const ACCESS_KEY = 'pixiv_access_token'
 const REFRESH_KEY = 'pixiv_refresh_token'
 const EXPIRES_AT_KEY = 'pixiv_access_expires_at' // 毫秒时间戳
 const USER_ID_KEY = 'pixiv_user_id'
+const PREMIUM_KEY = 'pixiv_is_premium'
 
 export interface PixivTokens {
   accessToken: string
@@ -37,6 +38,7 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_KEY)
   localStorage.removeItem(EXPIRES_AT_KEY)
   localStorage.removeItem(USER_ID_KEY)
+  localStorage.removeItem(PREMIUM_KEY)
 }
 
 export function getAccessToken(): string | null {
@@ -55,6 +57,16 @@ export function saveUserId(id: number | string): void {
 /** 获取当前 Pixiv 用户 ID */
 export function getUserId(): string | null {
   return localStorage.getItem(USER_ID_KEY)
+}
+
+/** 保存当前用户是否为 Pixiv 会员（premium） */
+export function savePremium(isPremium: boolean): void {
+  localStorage.setItem(PREMIUM_KEY, isPremium ? '1' : '0')
+}
+
+/** 当前用户是否为 Pixiv 会员（premium）。未登录/未知时按非会员处理。 */
+export function isPremiumUser(): boolean {
+  return localStorage.getItem(PREMIUM_KEY) === '1'
 }
 
 /** access_token 是否已过期（提前 60s 视为过期） */

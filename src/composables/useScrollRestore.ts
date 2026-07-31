@@ -8,9 +8,9 @@ import { onBeforeRouteLeave } from 'vue-router'
  *   则为 true，调用方可据此跳过自动刷新；从其他页面（tab 切换等）激活则为 false。
  *
  * 哪些路由算"子页面"（不应触发信息流刷新）：
- *   reader、user
+ *   reader、user、series
  */
-const SUB_PAGE_ROUTES = new Set(['reader', 'user'])
+const SUB_PAGE_ROUTES = new Set(['reader', 'user', 'series'])
 
 interface UseScrollRestoreOptions {
   /** 可选：页面主滚动容器（推荐用于 WebView 兼容） */

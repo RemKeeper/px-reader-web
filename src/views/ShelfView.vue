@@ -237,7 +237,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+// 显式组件名：保证 App.vue 中 keep-alive 的 include 稳定匹配
+defineOptions({ name: 'ShelfView' })
+import { onActivated, onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useShelfStore, useNovelStore } from '@/stores'
@@ -263,6 +265,12 @@ useScrollRestore({
 
 onMounted(() => {
   shelfStore.loadShelf()
+})
+
+// keep-alive 激活时：预加载 / 刷新阅读历史（本地 IndexedDB 读取，无网络请求），
+// 保证从阅读页返回后历史 Tab 数据是最新的，且切到历史 Tab 时秒开
+onActivated(() => {
+  shelfStore.loadRecentNovels()
 })
 
 const tabLabels = ['书架', '收藏', '历史']

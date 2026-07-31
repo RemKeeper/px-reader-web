@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useNovelStore, useBlockStore, useAuthStore } from '@/stores'
@@ -193,7 +193,20 @@ async function loadMore() {
   }
 }
 
-onMounted(async () => {
+async function loadInitial() {
+  loading.value = true
+  userInfo.value = null
+  novels.value = []
+  nextUrl.value = null
+  // 命中新鲜缓存：立即渲染，不重新请求
+  const hit = novelStore.getCachedUserPage(props.id)
+  if (hit) {
+    userInfo.value = hit.user
+    novels.value = hit.novels
+    nextUrl.value = hit.nextUrl
+    loading.value = false
+    return
+  }
   const res = await novelStore.loadUserNovels(props.id)
   if (res) {
     userInfo.value = res.user
@@ -201,6 +214,10 @@ onMounted(async () => {
     nextUrl.value = res.next_url
   }
   loading.value = false
-})
+}
+
+onMounted(loadInitial)
+// 同一组件实例内切换用户 id（如直接从用户页跳到另一用户页）时重新加载
+watch(() => props.id, loadInitial)
 
 </script>

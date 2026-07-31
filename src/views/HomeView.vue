@@ -97,6 +97,8 @@
 </template>
 
 <script setup lang="ts">
+// 显式组件名：保证 App.vue 中 keep-alive 的 include 稳定匹配
+defineOptions({ name: 'HomeView' })
 import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'

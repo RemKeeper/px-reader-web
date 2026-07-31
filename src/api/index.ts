@@ -36,6 +36,7 @@ import {
   isAccessTokenExpired,
   saveUserId,
   getUserId,
+  savePremium,
 } from '@/utils/token'
 
 const BASE_URL = import.meta.env.DEV
@@ -83,10 +84,17 @@ function persistTokens(resp: PixivTokenResponse) {
     refreshToken: resp.refresh_token,
     expiresAt: Date.now() + (resp.expires_in || 3600) * 1000,
   })
-  // 从 token 响应中提取并保存 Pixiv 用户 ID
-  const user = resp.user as { id?: string | number } | undefined
+  // 从 token 响应中提取并保存 Pixiv 用户 ID 与会员状态（is_premium / premium）
+  const user = resp.user as
+    | { id?: string | number; is_premium?: boolean; premium?: boolean }
+    | undefined
   if (user?.id) {
     saveUserId(user.id)
+  }
+  if (typeof user?.is_premium === 'boolean') {
+    savePremium(user.is_premium)
+  } else if (typeof user?.premium === 'boolean') {
+    savePremium(user.premium)
   }
 }
 
@@ -401,19 +409,65 @@ export function getBookmarkedNovels(params?: {
   })
 }
 
-/** 搜索小说 */
+/** 搜索小说（会员 / 常规搜索，支持翻页与热度排序） */
 export function searchNovels(params: {
   word: string
   search_target?: string
   sort?: string
+  merge_plain_keyword_results?: string
+  include_translated_tag_results?: string
   offset?: string
+  /** 发布起始日期 YYYY-MM-DD */
+  start_date?: string
+  /** 发布结束日期 YYYY-MM-DD */
+  end_date?: string
+  /** 最少收藏数（会员场景下生效） */
+  bookmark_num_min?: number
+  filter?: string
+  lang?: string
 }): Promise<FollowNovelsResponse> {
   return apiRequest<FollowNovelsResponse>('/v1/search/novel', {
     query: {
       word: params.word,
       search_target: params.search_target || 'partial_match_for_tags',
       sort: params.sort || 'date_desc',
+      merge_plain_keyword_results: params.merge_plain_keyword_results || 'true',
+      include_translated_tag_results: params.include_translated_tag_results || 'true',
       offset: params.offset,
+      start_date: params.start_date,
+      end_date: params.end_date,
+      bookmark_num_min:
+        params.bookmark_num_min !== undefined ? String(params.bookmark_num_min) : undefined,
+      filter: params.filter || 'for_android',
+      lang: params.lang,
+    },
+  })
+}
+
+/**
+ * 非会员热度预览搜索：/v1/search/popular-preview/novel
+ * 该端点不接受 sort 参数（传了会 400），通常只返回单页热度预览，无法翻页。
+ */
+export function searchPopularPreviewNovels(params: {
+  word: string
+  search_target?: string
+  merge_plain_keyword_results?: string
+  include_translated_tag_results?: string
+  start_date?: string
+  end_date?: string
+  filter?: string
+  lang?: string
+}): Promise<FollowNovelsResponse> {
+  return apiRequest<FollowNovelsResponse>('/v1/search/popular-preview/novel', {
+    query: {
+      word: params.word,
+      search_target: params.search_target || 'partial_match_for_tags',
+      merge_plain_keyword_results: params.merge_plain_keyword_results || 'true',
+      include_translated_tag_results: params.include_translated_tag_results || 'true',
+      start_date: params.start_date,
+      end_date: params.end_date,
+      filter: params.filter || 'for_android',
+      lang: params.lang,
     },
   })
 }

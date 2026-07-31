@@ -73,7 +73,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { getNovelSeries, getProxiedImageUrl } from '@/api'
+import { getProxiedImageUrl } from '@/api'
 import { useBlockStore, useNovelStore, useAuthStore } from '@/stores'
 import { usePageTitle, useScrollRestore } from '@/composables'
 import { ApiError, type NovelMeta, type NovelSeriesDetail } from '@/types'
@@ -117,32 +117,37 @@ async function loadInitial() {
   detail.value = null
   novels.value = []
   nextUrl.value = null
-  try {
-    const res = await getNovelSeries({ series_id: props.id })
-    detail.value = res.novel_series_detail
-    novels.value = res.novels || []
-    nextUrl.value = res.next_url
-    novelStore.cacheNovelMetas(novels.value)
-  } catch (error) {
-    handleError(error)
-  } finally {
+  // 命中新鲜缓存：立即渲染，不重新请求
+  const hit = novelStore.getCachedSeries(props.id)
+  if (hit) {
+    detail.value = hit.detail
+    novels.value = hit.novels
+    nextUrl.value = hit.nextUrl
     loading.value = false
+    return
   }
+  const res = await novelStore.loadSeries(props.id)
+  if (res) {
+    detail.value = res.detail
+    novels.value = res.novels
+    nextUrl.value = res.nextUrl
+  } else {
+    handleError(new Error(novelStore.error || '加载系列失败'))
+  }
+  loading.value = false
 }
 
 async function loadMore() {
   if (loadingMore.value || !nextUrl.value) return
   loadingMore.value = true
-  try {
-    const res = await getNovelSeries({ series_id: props.id, next_url: nextUrl.value })
-    novels.value.push(...(res.novels || []))
-    nextUrl.value = res.next_url
-    novelStore.cacheNovelMetas(res.novels || [])
-  } catch (error) {
-    handleError(error)
-  } finally {
-    loadingMore.value = false
+  const res = await novelStore.loadSeries(props.id, { nextUrl: nextUrl.value })
+  if (res) {
+    novels.value = res.novels
+    nextUrl.value = res.nextUrl
+  } else {
+    handleError(new Error(novelStore.error || '加载系列失败'))
   }
+  loadingMore.value = false
 }
 
 function handleError(error: unknown) {
