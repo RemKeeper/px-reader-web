@@ -71,14 +71,23 @@
             <span class="text-ellipsis max-w-64">{{ novelMeta.series.title }}</span>
             <van-icon name="arrow" size="10" />
           </div>
-          <NovelStats
-            :text-length="novelMeta.text_length"
-            :bookmarks="novelMeta.total_bookmarks"
-            :views="novelMeta.total_view"
-            :comments="novelMeta.total_comments"
-            size="sm"
-            class="mt-2"
-          />
+          <div class="flex items-center flex-wrap gap-x-3 gap-y-1 mt-2">
+            <NovelStats
+              :text-length="novelMeta.text_length"
+              :bookmarks="novelMeta.total_bookmarks"
+              :views="novelMeta.total_view"
+              :comments="novelMeta.total_comments"
+              size="sm"
+            />
+            <span
+              v-if="formattedCreateDate"
+              class="inline-flex items-center gap-1 text-text-secondary text-xs"
+              :title="novelMeta.create_date"
+            >
+              <van-icon name="clock-o" size="12" />
+              {{ formattedCreateDate }}
+            </span>
+          </div>
           <p
             v-if="novelMeta.caption"
             class="text-text-secondary text-xs mt-2 leading-relaxed line-clamp-2"
@@ -1002,6 +1011,16 @@ usePageTitle(() => novelTitle.value || novelMeta.value?.title || '')
 const authorAvatar = computed(() => {
   const url = novelMeta.value?.user?.profile_image_urls?.medium
   return url ? getProxiedImageUrl(url) : ''
+})
+
+/** 格式化发布时间（Pixiv 返回 ISO 8601，如 2024-01-01T12:00:00+09:00） */
+const formattedCreateDate = computed(() => {
+  const raw = novelMeta.value?.create_date
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return raw
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 })
 
 function goToAuthor() {
