@@ -70,7 +70,7 @@ curl http://127.0.0.1:8000/
 在前端仓库根目录的 `.env.production` 中：
 
 ```env
-VITE_API_BASE_URL=https://px-reader-web-production-xxxx.up.railway.app
+VITE_API_BASE_URL=https://px-reader-web-production-b1ac.up.railway.app
 ```
 
 然后重新执行前端打包构建即可。
