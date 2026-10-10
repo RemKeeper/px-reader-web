@@ -1,0 +1,17 @@
+{
+  "tasks": {
+    "dev": "deno run -A --watch main.ts"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": false,
+    "singleQuote": true
+  }
+}

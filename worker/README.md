@@ -51,6 +51,14 @@ const ALLOWED_ORIGINS = new Set([
 ])
 ```
 
+## 可选版本
+
+本项目提供了多种部署环境的代理实现：
+
+- `worker.js` (根目录)：Cloudflare Workers 版（注意：CF 出口 IP 目前可能被 Pixiv 封禁）
+- `deno/`：[Deno Deploy 版](./deno/README.md)（出口走 Google 边缘）
+- `railway/`：[Railway 版](./railway/README.md)（基于 Dockerfile，走 GCP 出口，不受 CF 封禁影响）
+
 ## 路由表
 
 | 方法 | 路径 | 上游 |
