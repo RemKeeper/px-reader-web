@@ -64,6 +64,10 @@ export async function getNovelFromShelf(id: number): Promise<LocalNovelMeta | un
   return db.novels.get(id)
 }
 
+export async function getNovelByTxtFileId(txtFileId: string): Promise<LocalNovelMeta | undefined> {
+  return db.novels.filter((novel) => novel.txtFileId === txtFileId).first()
+}
+
 export async function getAllNovels(): Promise<LocalNovelMeta[]> {
   return db.novels.orderBy('lastReadAt').reverse().toArray()
 }
@@ -121,7 +125,16 @@ export async function getAllTxtCaches(): Promise<TxtFileCache[]> {
 }
 
 export async function removeTxtCache(id: string): Promise<void> {
-  await db.txtCache.delete(id)
+  await db.transaction('rw', [db.txtCache, db.novels, db.progress, db.bookmarks, db.readingHistory], async () => {
+    const linkedNovels = await db.novels.filter((novel) => novel.txtFileId === id).toArray()
+    await db.txtCache.delete(id)
+    for (const novel of linkedNovels) {
+      await db.novels.delete(novel.id)
+      await db.progress.delete(novel.id)
+      await db.bookmarks.where('novelId').equals(novel.id).delete()
+      await db.readingHistory.delete(novel.id)
+    }
+  })
 }
 
 // ── Reading History CRUD ──────────────────────────────

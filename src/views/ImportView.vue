@@ -44,8 +44,8 @@
           <van-button type="primary" size="small" round @click="goToReader">
             开始阅读
           </van-button>
-          <van-button size="small" round @click="addToShelf">
-            加入书架
+          <van-button size="small" round disabled>
+            已自动加入书架
           </van-button>
         </div>
       </div>
@@ -85,7 +85,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { splitChaptersInWorker, decodeTextInWorker } from '@/workers'
-import { saveTxtCache, getAllTxtCaches, removeTxtCache } from '@/db'
+import { addNovelToShelf, getAllTxtCaches, getNovelFromShelf, removeTxtCache, saveTxtCache } from '@/db'
 import { useSettingsStore, useShelfStore } from '@/stores'
 import { useScrollRestore } from '@/composables'
 import type { TxtFileCache, LocalNovelMeta } from '@/types'
@@ -157,6 +157,7 @@ async function processFile(file: File) {
 
     processingStatus.value = '保存中...'
     await saveTxtCache(cache)
+    await addToShelf(cache)
 
     imported.value = cache
     await loadTxtList()
@@ -170,37 +171,41 @@ async function processFile(file: File) {
 
 function goToReader() {
   if (imported.value) {
-    router.push(`/novel/${imported.value.id}`)
+    router.push(`/novel/${shelfIdForTxt(imported.value.id)}`)
   }
 }
 
-async function addToShelf() {
-  if (!imported.value) return
+async function addToShelf(txt: TxtFileCache) {
+  await saveTxtShelfEntry(txt)
+  await shelfStore.loadShelf()
+}
+
+async function saveTxtShelfEntry(txt: TxtFileCache) {
+  const id = shelfIdForTxt(txt.id)
+  const existing = await getNovelFromShelf(id)
   const meta: LocalNovelMeta = {
-    id: 0, // TXT 文件用 hash
-    title: imported.value.fileName,
+    id,
+    title: txt.fileName,
     coverUrl: '',
     authorName: '本地导入',
     authorId: 0,
     authorAvatar: '',
-    caption: `${imported.value.chapters.length} 章`,
+    caption: `${txt.chapters.length} 章`,
     tags: ['TXT'],
-    textLength: imported.value.content.length,
+    textLength: txt.content.length,
     totalBookmarks: 0,
     totalView: 0,
     isXRestricted: false,
-    addedAt: Date.now(),
-    lastReadAt: Date.now(),
+    txtFileId: txt.id,
+    addedAt: existing?.addedAt ?? Date.now(),
+    lastReadAt: existing?.lastReadAt ?? Date.now(),
   }
-  // 使用 hash 作为 ID
-  const hashId = hashCode(imported.value.id)
-  meta.id = hashId
-  await shelfStore.addToShelf(meta)
-  showToast('已加入书架')
+  await addNovelToShelf(meta)
 }
 
-function goToTxtReader(id: string) {
-  router.push(`/novel/${id}`)
+async function goToTxtReader(id: string) {
+  const shelfNovel = await getNovelFromShelf(shelfIdForTxt(id))
+  router.push(`/novel/${shelfNovel?.txtFileId === id ? shelfNovel.id : id}`)
 }
 
 async function removeTxt(id: string) {
@@ -220,7 +225,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
-function hashCode(str: string): number {
+function shelfIdForTxt(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i)

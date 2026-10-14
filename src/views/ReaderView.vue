@@ -651,7 +651,7 @@ import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { useNovelStore, useSettingsStore, useShelfStore, useAuthStore } from '@/stores'
 import { splitChaptersInWorker } from '@/workers'
-import { getTxtCache } from '@/db'
+import { getNovelByTxtFileId, getNovelFromShelf, getTxtCache } from '@/db'
 import { getProxiedImageUrl, bookmarkNovel, unbookmarkNovel, getBookmarkDetail, translateWithDeepLX } from '@/api'
 import { usePageTitle } from '@/composables'
 import {
@@ -688,6 +688,8 @@ const showMenu = ref(false)
 const scrollPercent = ref(0)
 const activeChapter = ref(0)
 const isInShelf = ref(false)
+const currentNovelId = ref<number | null>(null)
+const localTxtFileId = ref<string | null>(null)
 const bookmarkLoading = ref(false)
 const showTagDialog = ref(false)
 const existingTags = ref<{ name: string }[]>([])
@@ -1158,7 +1160,9 @@ function nextChapter() {
 }
 
 async function toggleShelf() {
-  const novelId = Number(props.id)
+  const novelId = currentNovelId.value
+  if (novelId === null) return
+
   if (isInShelf.value) {
     await shelfStore.removeFromShelf(novelId)
     isInShelf.value = false
@@ -1178,6 +1182,7 @@ async function toggleShelf() {
       totalBookmarks: m?.total_bookmarks || m?.total_bookmarks || 0,
       totalView: m?.total_view || 0,
       isXRestricted: !!m?.is_x_restricted,
+      txtFileId: localTxtFileId.value || undefined,
       series: m?.series?.id ? { id: m.series.id, title: m.series.title } : undefined,
       addedAt: Date.now(),
       lastReadAt: Date.now(),
@@ -1359,9 +1364,9 @@ function goBack() {
 
 // 保存进度
 function saveCurrentProgress() {
-  if (scrollPercent.value > 0) {
+  if (scrollPercent.value > 0 && currentNovelId.value !== null) {
     shelfStore.saveProgress({
-      novelId: Number(props.id),
+      novelId: currentNovelId.value,
       scrollPercent: scrollPercent.value,
       chapterIndex: activeChapter.value,
       charOffset: chapters.value[activeChapter.value]?.startOffset || 0,
@@ -1376,9 +1381,14 @@ watch([translationApiUrl, translationSourceLang, translationTargetLang], () => {
 
 onMounted(async () => {
   const novelId = props.id
+  const parsedNovelId = Number(novelId)
+  let localMeta = Number.isSafeInteger(parsedNovelId)
+    ? await getNovelFromShelf(parsedNovelId)
+    : undefined
+  currentNovelId.value = localMeta?.id ?? (Number.isSafeInteger(parsedNovelId) ? parsedNovelId : null)
 
   // 检查是否在书架
-  isInShelf.value = await shelfStore.isInShelf(Number(novelId))
+  isInShelf.value = !!localMeta
 
   // 先尝试从 store 缓存拿 meta（推荐/关注/搜索页跳转过来的会命中）
   const cachedMeta = novelStore.getNovelMetaById(novelId)
@@ -1388,14 +1398,25 @@ onMounted(async () => {
   }
 
   // 先检查本地缓存
-  const cached = await getTxtCache(novelId)
+  const cached = await getTxtCache(localMeta?.txtFileId || novelId)
   if (cached) {
+    localTxtFileId.value = cached.id
+    if (!localMeta) {
+      localMeta = await getNovelByTxtFileId(cached.id)
+      if (localMeta) {
+        currentNovelId.value = localMeta.id
+        isInShelf.value = true
+      }
+    }
     content.value = cached.content
     chapters.value = cached.chapters
     // 本地缓存不带 hasNaturalSplits、从章节标题启发式判定
     hasNaturalChapters.value = cached.chapters.length > 1 &&
       cached.chapters.some((c) => /^(第[一二三四五六七八九十百千万零\d]+[章节回卷篇集部]|Chapter\s+\d+)/i.test(c.title))
     novelTitle.value = cached.fileName
+    loading.value = false
+  } else if (localMeta?.txtFileId) {
+    loadError.value = '本地 TXT 文件不存在或已删除'
     loading.value = false
   } else {
     // 从 API 加载（未登录时自动尝试免登录模式）
@@ -1418,11 +1439,11 @@ onMounted(async () => {
   translationTargetLang.value = settingsStore.settings.translationTargetLang || inferBrowserTargetLanguage()
 
   // 将小说记录到独立的阅读历史中（不影响书架）
-  {
+  if (currentNovelId.value !== null) {
     const m = novelMeta.value
     const title = m?.title || novelTitle.value || `小说 #${novelId}`
     shelfStore.saveReadingHistory({
-      id: Number(novelId),
+      id: currentNovelId.value,
       title,
       coverUrl: m?.image_urls?.large || m?.image_urls?.medium || '',
       authorName: m?.user?.name || '',
@@ -1441,7 +1462,9 @@ onMounted(async () => {
   }
 
   // 恢复阅读进度
-  const progress = await shelfStore.getProgress(Number(novelId))
+  const progress = currentNovelId.value === null
+    ? undefined
+    : await shelfStore.getProgress(currentNovelId.value)
   if (progress && contentRef.value) {
     await nextTick()
     setTimeout(() => {

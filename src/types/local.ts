@@ -26,6 +26,8 @@ export interface LocalNovelMeta {
   totalView: number
   /** 是否 R18 */
   isXRestricted: boolean
+  /** 关联的本地 TXT 文件 ID */
+  txtFileId?: string
   /** 系列信息 */
   series?: { id: number; title: string }
   /** 加入书架时间 */
