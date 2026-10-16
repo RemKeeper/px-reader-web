@@ -77,6 +77,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '导入 TXT' },
   },
   {
+    path: '/read',
+    name: 'quick-read',
+    component: () => import('@/views/QuickReadView.vue'),
+    meta: { title: '快速阅读' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
@@ -88,6 +94,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  // 兼容直接在站点根 URL 后携带文本直链：/?url=https%3A%2F%2F...
+  if (to.path === '/' && typeof to.query.url === 'string' && to.query.url.trim()) {
+    return { name: 'quick-read', query: { url: to.query.url } }
+  }
+
   const title = (to.meta.title as string) || 'PX-Reader'
   document.title = `${title} - PX-Reader`
 })

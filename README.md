@@ -20,6 +20,7 @@
 - 🎯 **虚拟滚动** - 采用 TanStack Vue Virtual 优化大列表性能
 - 🔤 **字符集自动检测** - 使用 jschardet + iconv-lite 自动处理文本编码
 - 🛡️ **CORS 透明代理** - 通过 Deno Deploy 绕过 Pixiv WAF
+- 🔗 **文本直链快速阅读** - 访问 `/read?url=<文本直链>`，自动抓取、分章并加入书架
 
 ## 🚀 快速开始
 

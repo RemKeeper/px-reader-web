@@ -686,3 +686,10 @@ export function getProxiedImageUrl(imageUrl: string): string {
   }
   return imageUrl
 }
+
+/** 通过代理抓取任意文本直链，返回 ArrayBuffer（由调用方解码） */
+export async function fetchTextFromUrl(textUrl: string): Promise<ArrayBuffer> {
+  const res = await fetch(`${BASE_URL}/fetch-text?url=${encodeURIComponent(textUrl)}`)
+  if (!res.ok) throw new Error(`抓取失败: HTTP ${res.status}`)
+  return res.arrayBuffer()
+}

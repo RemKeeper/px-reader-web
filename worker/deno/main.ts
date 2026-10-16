@@ -11,6 +11,7 @@
  *   *     /app/<path>              → https://app-api.pixiv.net/<path>
  *   GET   /image?url=<encoded>     → 透传 i.pximg.net 图片（注入 Referer）
  *   POST  /translate/deeplx        → DeepLX 兼容接口转发
+ *   GET   /fetch-text?url=<encoded> → 代理抓取任意文本直链（避免 CORS）
  *   *     /                        → 健康检查
  *
  * 服务端备用 Token（免登录分享）：
@@ -398,6 +399,30 @@ async function handleDeepLXTranslate(req: Request): Promise<Response> {
   return new Response(upstream.body, { status: upstream.status, headers })
 }
 
+async function handleFetchText(url: URL): Promise<Response> {
+  const textUrl = url.searchParams.get('url')
+  if (!textUrl) return new Response('missing url parameter', { status: 400 })
+  let parsed: URL
+  try { parsed = new URL(textUrl) } catch { return new Response('invalid url', { status: 400 }) }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return new Response('unsupported url protocol', { status: 400 })
+  }
+  const upstream = await fetch(parsed.toString(), {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+  })
+  if (!upstream.ok) {
+    return new Response(`upstream returned ${upstream.status}`, { status: upstream.status })
+  }
+  const respHeaders = new Headers()
+  const ct = upstream.headers.get('Content-Type')
+  respHeaders.set('Content-Type', ct || 'application/octet-stream')
+  respHeaders.set('Cache-Control', 'public, max-age=3600')
+  return new Response(upstream.body, { status: 200, headers: respHeaders })
+}
+
 async function handle(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) })
@@ -418,6 +443,8 @@ async function handle(req: Request): Promise<Response> {
       }
     } else if (url.pathname === '/image') {
       resp = await handleImage(url)
+    } else if (url.pathname === '/fetch-text') {
+      resp = await handleFetchText(url)
     } else if (url.pathname === '/translate/deeplx') {
       resp = await handleDeepLXTranslate(req)
     } else if (url.pathname === '/' || url.pathname === '') {
